@@ -1,0 +1,54 @@
+packages:
+  # This is an inline package to prefix the on_client_connected with the wait_until action
+  # It must appear before the actual package so it becomes the orignal config and the
+  # on_client_connected list from the package config is appended onto this one.
+  va_connected_wait_for_ble:
+    voice_assistant:
+      on_client_connected:
+        - wait_until:
+            not: ble.enabled
+        - delay: 2s
+    wifi:
+      on_disconnect:
+        - ble.enable:
+  respeaker-satellite: !include respeaker-satellite-firmware.yaml
+
+esphome:
+  project: 
+    name: formatbce.respeaker_satellite
+    version: 2024.11.6
+
+ota:
+  - platform: http_request
+    id: ota_http_request
+
+http_request:
+
+update:
+  - platform: http_request
+    name: Firmware Update
+    update_interval: 30min
+    source: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/refs/heads/factory/satellite-firmware/manifest.json
+
+dashboard_import:
+  package_import_url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/tree/main/satellite-firmware/respeaker-satellite-firmware.yaml
+
+wifi:
+  on_connect:
+    - delay: 5s  # Gives time for improv results to be transmitted
+    - ble.disable:
+    - script.execute: control_leds
+
+improv_serial:
+
+esp32_improv:
+  authorizer: center_button
+  on_start:
+    - lambda: id(improv_ble_in_progress) = true;
+    - script.execute: control_leds
+  on_provisioned:
+    - lambda: id(improv_ble_in_progress) = false;
+    - script.execute: control_leds
+  on_stop:
+    - lambda: id(improv_ble_in_progress) = false;
+    - script.execute: control_leds
