@@ -19,7 +19,7 @@ esphome:
   name: respeaker-satellite
   friendly_name: Respeaker Satellite
   name_add_mac_suffix: true
-  min_version: 2024.9.0
+  min_version: 2024.12.0
   platformio_options:
     board_build.flash_mode: dio
   on_boot:
@@ -111,9 +111,10 @@ ota:
     id: ota_esphome
 
 i2c:
-  sda: GPIO5
-  scl: GPIO6
-  scan: true
+  - id: internal_i2c
+    sda: GPIO5
+    scl: GPIO6
+    scan: true
 
 psram:
   mode: octal
@@ -158,6 +159,11 @@ globals:
   - id: is_timer_active
     type: bool
     restore_value: false
+  # Global variable storing if a factory reset was requested. If it is set to true, the device will factory reset once the center button is released
+  - id: factory_reset_requested
+    type: bool
+    restore_value: no
+    initial_value: 'false'
 
 switch:
   # Hardware speaker mute
@@ -273,12 +279,12 @@ binary_sensor:
       - script.execute: control_leds
     on_release:
       - script.execute: control_leds
-  - platform: gpio
-    id: user_button
-    pin:
-      number: GPIO42
-      inverted: true
-    name: "User button"
+      # If a factory reset is requested, factory reset on release
+      - if:
+          condition:
+            lambda: return id(factory_reset_requested);
+          then:
+            - button.press: factory_reset_button
     on_multi_click:
       # Simple Click:
       #   - Abort "things" in order
@@ -399,26 +405,59 @@ binary_sensor:
       - timing:
           - ON for at least 10s
         then:
-          - light.turn_on:
-              brightness: 100%
-              id: voice_assistant_leds
-              effect: "Factory Reset Coming Up"
-          - script.execute:
-              id: play_sound
-              priority: true
-              sound_file: !lambda return id(factory_reset_initiated_sound);
-          - wait_until:
-              binary_sensor.is_off: user_button
-          - light.turn_off: voice_assistant_leds
-          - script.execute:
-              id: play_sound
-              priority: true
-              sound_file: !lambda return id(factory_reset_cancelled_sound);
-      # Factory Reset
+          - if:
+              condition:
+                lambda: return !id(dial_touched);
+              then:
+                - light.turn_on:
+                    brightness: 100%
+                    id: voice_assistant_leds
+                    effect: "Factory Reset Coming Up"
+                - script.execute:
+                    id: play_sound
+                    priority: true
+                    sound_file: !lambda return id(factory_reset_initiated_sound);
+                - wait_until:
+                    binary_sensor.is_off: rotary_button
+                - if:
+                    condition:
+                      lambda: return !id(factory_reset_requested);
+                    then:
+                      - light.turn_off: voice_assistant_leds
+                      - script.execute:
+                          id: play_sound
+                          priority: true
+                          sound_file: !lambda return id(factory_reset_cancelled_sound);
+      # Factory Reset Confirmed.
+      #  . Audible warning to prompt user to release the button
+      #  . Set factory_reset_requested to true
       - timing:
           - ON for at least 22s
         then:
-          - button.press: factory_reset_button
+          - if:
+              condition:
+                lambda: return !id(dial_touched);
+              then:
+                - script.execute:
+                    id: play_sound
+                    priority: true
+                    sound_file: !lambda return id(factory_reset_confirmed_sound);
+                - light.turn_on:
+                    brightness: 100%
+                    red: 100%
+                    green: 0%
+                    blue: 0%
+                    id: voice_assistant_leds
+                    effect: "none"
+                - lambda: id(factory_reset_requested) = true;
+
+  - platform: gpio
+    # TODO figure out what to use it for
+    id: user_button
+    pin:
+      number: GPIO42
+      inverted: true
+    name: "User button"
 
 light:
   # Hardware LED ring. Not used because remapping needed
@@ -720,6 +759,7 @@ light:
   #  default_transition_length: 0s
 
 sensor:
+  # The dial. Used to control volume and Hue of the LED ring.
   - platform: rotary_encoder
     id: dial
     pin_a: GPIO47
@@ -751,15 +791,6 @@ sensor:
             - script.execute:
                 id: control_hue
                 increase_hue: false
-  - platform: debug
-    free:
-      name: "Heap Free"
-    block:
-      name: "Heap Max Block"
-    loop_time:
-      name: "Loop Time"
-    psram:
-      name: "Free PSRAM"
 
 event:
   # Event entity exposed to the user to automate on complex center button presses.
@@ -820,7 +851,7 @@ script:
   - id: control_leds_improv_ble_state
     then:
       - light.turn_on:
-          brightness: 66%
+          brightness: 50%
           red: 100%
           green: 89%
           blue: 71%
@@ -836,7 +867,7 @@ script:
             wifi.connected:
           then:
             - light.turn_on:
-                brightness: 66%
+                brightness: 50%
                 red: 9.4%
                 green: 73.3%
                 blue: 94.9%
@@ -844,7 +875,7 @@ script:
                 effect: "Twinkle"
           else:
             - light.turn_on:
-                brightness: 66%
+                brightness: 50%
                 red: 100%
                 green: 89%
                 blue: 71%
@@ -856,7 +887,7 @@ script:
   - id: control_leds_no_ha_connection_state
     then:
       - light.turn_on:
-          brightness: 66%
+          brightness: 50%
           red: 1
           green: 0
           blue: 0
@@ -1248,6 +1279,8 @@ media_player:
         file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/factory_reset_initiated.mp3
       - id: factory_reset_cancelled_sound
         file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/factory_reset_cancelled.mp3
+      - id: factory_reset_confirmed_sound
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/factory_reset_confirmed.mp3
       - id: mute_switch_on_sound
         file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/mute_switch_on.flac
       - id: mute_switch_off_sound
@@ -1299,11 +1332,12 @@ external_components:
 
 audio_dac:
   - platform: aic3204
+    i2c_id: internal_i2c
 
 micro_wake_word:
   id: mww
   models:
-    - model: okay_nabu
+    - model: https://github.com/kahrendt/microWakeWord/releases/download/okay_nabu_20241205.4/okay_nabu.json
       probability_cutoff: 0.8
       id: okay_nabu
     - model: hey_jarvis
@@ -1362,9 +1396,6 @@ voice_assistant:
   auto_gain: 0 dbfs
   volume_multiplier: 1
   on_client_connected:
-    - wait_until:
-        not: ble.enabled
-    - delay: 2s
     - if:
         condition:
           - lambda: return id(init_in_progress);
@@ -1453,10 +1484,3 @@ button:
 
 debug:
   update_interval: 5s
-
-text_sensor:
-  - platform: debug
-    device:
-      name: "Device Info"
-    reset_reason:
-      name: "Reset Reason"
