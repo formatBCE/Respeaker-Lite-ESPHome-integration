@@ -16,7 +16,7 @@ packages:
 esphome:
   project: 
     name: formatbce.respeaker_satellite
-    version: 2024.11.6
+    version: 2024.11.7
 
 ota:
   - platform: http_request
@@ -31,7 +31,7 @@ update:
     source: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/refs/heads/factory/satellite-firmware/manifest.json
 
 dashboard_import:
-  package_import_url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/tree/main/satellite-firmware/respeaker-satellite-firmware.yaml
+  package_import_url: github://formatBCE/Respeaker-Lite-ESPHome-integration/satellite-firmware/respeaker-satellite-firmware.yaml@factory
 
 wifi:
   on_connect:
@@ -42,7 +42,7 @@ wifi:
 improv_serial:
 
 esp32_improv:
-  authorizer: center_button
+  authorizer: rotary_button
   on_start:
     - lambda: id(improv_ble_in_progress) = true;
     - script.execute: control_leds
