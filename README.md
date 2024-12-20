@@ -2,6 +2,7 @@
 This repository contains example code to integrate Seeed Respeaker Lite Voice Kit (with XIAO ESP32-S3 on board) with ESPHome.
 I'm thankful for continuous help of ESPHome team and Seeed developers, that let me put this thing together. 
 It's using [brilliant job of ESPHome team](https://github.com/esphome/home-assistant-voice-pe), as well as firmware and guides from [Seeed Wiki](https://wiki.seeedstudio.com/xiao_respeaker/) and [their repository for Respeaker](https://github.com/respeaker/ReSpeaker_Lite/tree/master).
+* This project is using MicroWakeWord. If you want to try training custom wake word for it (and are pretty experienced!), you can use [following notebook](https://github.com/kahrendt/microWakeWord/blob/november-update/notebooks/basic_training_notebook.ipynb) for this.
 
 ### *Disclaimer
 #### Use this on your own risk. Expect breaking changes.
