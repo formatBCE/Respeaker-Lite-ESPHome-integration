@@ -3,11 +3,11 @@
 ## What is it
 This repository contains example code to integrate Seeed Respeaker Lite Voice Kit (with XIAO ESP32-S3 on board) with ESPHome.
 I'm thankful for continuous help of ESPHome team and Seeed developers, that let me put this thing together. 
-It's using [brilliant job of ESPHome team](https://github.com/esphome/home-assistant-voice-pe), as well as firmware and guides from [Seeed Wiki](https://wiki.seeedstudio.com/xiao_respeaker/) and [their repository for Respeaker](https://github.com/respeaker/ReSpeaker_Lite/tree/master).
+It's using [official code for Voice Preview Edition by ESPHome team](https://github.com/esphome/home-assistant-voice-pe), as well as firmware and guides from [Seeed Wiki](https://wiki.seeedstudio.com/xiao_respeaker/) and [their repository for Respeaker](https://github.com/respeaker/ReSpeaker_Lite/tree/master).
 
 ## *Disclaimer
 ### Use this on your own risk. Expect breaking changes.
-At the moment, all this is changing at very fast pace. Respeaker board considered alpha, PE (Voice Kit) software is under heavy development. I will try to update YAML and XMOS board firmware as soon as i can, but it can't be instantenuous...
+Although Voice PE is released, parts of its code are still under development and merging to ESPHome core repository with breaking changes. I will try to update YAML and XMOS board firmware as soon as i can, but it can't be instantenuous...
 If you encounter a problem, before creating ticket here you may go to PE and Seeed repos, linked above, and see if something changed there. I'll gladly accept pull-requests. :)
 
 ## Why?
@@ -18,7 +18,7 @@ With this board i finally can build device, that will satisfy me and (more impor
 __* Thanks to Mike aka @mikey60 and his fork to nabu_microphone, this project is using 48kHz sample rate for better music playback quality.*__
 1. Get Respeaker Lite with ESP32 soldered to it (you may solder it yourself, pins on the back can remain dry, they're not used).
 2. [Solder USR to D2 and MUTE to D3 pins](https://wiki.seeedstudio.com/respeaker_button/). _**ATTENTION! This step is mandatory, as without it the buttons on satellite won't work as intended.**_
-3. [Flash latest 48kHz I2S firmware to the XMOS board](https://wiki.seeedstudio.com/xiao_respeaker/#flash-the-i2s-firmware) (pay attention to USB port, you need the main board port, not ESP32 one) Make sure you're using 48kHz version, as default one is 16kHz and won't work with this repo.
+3. [Flash 48kHz I2S firmware of version **not lower than 1.1.0** to the XMOS board](https://wiki.seeedstudio.com/xiao_respeaker/#flash-the-i2s-firmware) (pay attention to USB port, you need the main board port, not ESP32 one). Make sure you're using 48kHz version, as 16kHz version won't work with this repo. You can use included [firmware file](/respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin) to be sure.
 5. Flash ESPHome firmware (YAML included, place `/config/common/respeaker-satellite-base.yaml` into ESPHome `common` directory, and adjust `/config/respeaker-satellite-dashboard-example.yaml` to your needs) to ESP32 (use its port).
 6. Add device to Home Assistant.
 
