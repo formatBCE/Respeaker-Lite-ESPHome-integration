@@ -839,9 +839,11 @@ microphone:
     i2s_mode: secondary
     i2s_audio_id: i2s_input
     channel_0:
-      id: nabu_mic_mww
-    channel_1:
       id: nabu_mic_va
+      amplify_shift: 0
+    channel_1:
+      id: nabu_mic_mww
+      amplify_shift: 2
       
 speaker:
   # Hardware speaker output
