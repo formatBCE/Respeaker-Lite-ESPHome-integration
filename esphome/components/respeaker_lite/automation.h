@@ -4,7 +4,7 @@
 #include "esphome/core/automation.h"
 
 namespace esphome {
-namespace voice_kit {
+namespace respeaker_lite {
 
 template<typename... Ts> class RespeakerLiteFlashAction : public Action<Ts...> {
  public:
@@ -14,7 +14,7 @@ template<typename... Ts> class RespeakerLiteFlashAction : public Action<Ts...> {
  protected:
   RespeakerLite *parent_;
 };
-#ifdef USE_VOICE_KIT_STATE_CALLBACK
+#ifdef USE_RESPEAKER_LITE_STATE_CALLBACK
 class DFUStartTrigger : public Trigger<> {
  public:
   explicit DFUStartTrigger(RespeakerLite *parent) {
@@ -63,5 +63,5 @@ class DFUErrorTrigger : public Trigger<uint8_t> {
   }
 };
 #endif
-}  // namespace voice_kit
+}  // namespace respeaker_lite
 }  // namespace esphome
