@@ -21,7 +21,7 @@ static const uint8_t CONFIGURATION_SERVICER_RESID = 241;
 static const uint8_t CONFIGURATION_COMMAND_READ_BIT = 0x80;
 static const uint8_t DFU_COMMAND_READ_BIT = 0x80;
 
-static const uint16_t DFU_TIMEOUT_MS = 1000;
+static const uint16_t DFU_TIMEOUT_MS = 4000;
 static const uint16_t MAX_XFER = 128;  // maximum number of bytes we can transfer per block
 
 enum TransportProtocolReturnCode : uint8_t {

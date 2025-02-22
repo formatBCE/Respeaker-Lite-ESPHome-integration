@@ -187,7 +187,7 @@ RespeakerLiteUpdaterStatus RespeakerLite::dfu_update_send_block_() {
         return UPDATE_VERIFY_NEW_VERSION;
 
       case UPDATE_VERIFY_NEW_VERSION:
-        if (millis() > this->last_progress_ + 200) {
+        if (millis() > this->last_progress_ + 500) {
           this->last_progress_ = millis();
           if (!this->dfu_get_version_()) {
             return UPDATE_VERIFY_NEW_VERSION;
