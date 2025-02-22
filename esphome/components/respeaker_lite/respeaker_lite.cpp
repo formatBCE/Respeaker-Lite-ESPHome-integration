@@ -203,7 +203,6 @@ RespeakerLiteUpdaterStatus RespeakerLite::dfu_update_send_block_() {
 #ifdef USE_RESPEAKER_LITE_STATE_CALLBACK
         this->state_callback_.call(DFU_COMPLETE, 100.0f, UPDATE_OK);
 #endif
-        this->write_pipeline_stages();
         return UPDATE_OK;
 
       default:

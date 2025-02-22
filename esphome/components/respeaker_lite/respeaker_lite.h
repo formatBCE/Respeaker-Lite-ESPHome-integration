@@ -45,8 +45,6 @@ enum RespeakerLiteUpdaterStatus : uint8_t {
 // Configuration enums from the XMOS firmware's src/configuration/configuration_servicer.h
 enum ConfCommands : uint8_t {
   CONFIGURATION_SERVICER_RESID_VNR_VALUE = 0x00,
-  CONFIGURATION_SERVICER_RESID_CHANNEL_0_PIPELINE_STAGE = 0x30,
-  CONFIGURATION_SERVICER_RESID_CHANNEL_1_PIPELINE_STAGE = 0x40,
 };
 
 // DFU enums from https://github.com/xmos/sln_voice/blob/develop/examples/ffva/src/dfu_int/dfu_state_machine.h
