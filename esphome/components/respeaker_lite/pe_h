@@ -1,8 +1,5 @@
 #pragma once
 
-//#include <utility>
-#include "esphome/components/binary_sensor/binary_sensor.h"
-#include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/i2c/i2c.h"
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
@@ -10,7 +7,7 @@
 #include "esphome/core/hal.h"
 
 namespace esphome {
-namespace respeaker_lite {
+namespace voice_kit {
 
 static const uint8_t REGISTER_CHANNEL_1_STAGE = 0x40;
 
@@ -30,7 +27,7 @@ enum TransportProtocolReturnCode : uint8_t {
   CTRL_INVALID = 3,
 };
 
-enum RespeakerLiteUpdaterStatus : uint8_t {
+enum VoiceKitUpdaterStatus : uint8_t {
   UPDATE_OK,
   UPDATE_COMMUNICATION_ERROR,
   UPDATE_READ_VERSION_ERROR,
@@ -47,6 +44,19 @@ enum ConfCommands : uint8_t {
   CONFIGURATION_SERVICER_RESID_VNR_VALUE = 0x00,
   CONFIGURATION_SERVICER_RESID_CHANNEL_0_PIPELINE_STAGE = 0x30,
   CONFIGURATION_SERVICER_RESID_CHANNEL_1_PIPELINE_STAGE = 0x40,
+};
+
+enum PipelineStages : uint8_t {
+  PIPELINE_STAGE_NONE = 0,
+  PIPELINE_STAGE_AEC = 1,
+  PIPELINE_STAGE_IC = 2,
+  PIPELINE_STAGE_NS = 3,
+  PIPELINE_STAGE_AGC = 4,
+};
+
+enum MicrophoneChannels : uint8_t {
+  MICROPHONE_CHANNEL_0 = 0,
+  MICROPHONE_CHANNEL_1 = 1,
 };
 
 // DFU enums from https://github.com/xmos/sln_voice/blob/develop/examples/ffva/src/dfu_int/dfu_state_machine.h
@@ -110,7 +120,7 @@ enum DFUAutomationState {
   DFU_ERROR,
 };
 
-class RespeakerLite : public i2c::I2CDevice, public Component {
+class VoiceKit : public Component, public i2c::I2CDevice {
  public:
   void setup() override;
   bool can_proceed() override {
@@ -120,8 +130,8 @@ class RespeakerLite : public i2c::I2CDevice, public Component {
   float get_setup_priority() const override { return setup_priority::HARDWARE - 1; }
   void loop() override;
 
-#ifdef USE_RESPEAKER_LITE_STATE_CALLBACK
-  void add_on_state_callback(std::function<void(DFUAutomationState, float, RespeakerLiteUpdaterStatus)> &&callback) {
+#ifdef USE_VOICE_KIT_STATE_CALLBACK
+  void add_on_state_callback(std::function<void(DFUAutomationState, float, VoiceKitUpdaterStatus)> &&callback) {
     this->state_callback_.add(std::move(callback));
   }
 #endif
@@ -130,16 +140,6 @@ class RespeakerLite : public i2c::I2CDevice, public Component {
   void set_firmware_bin(const uint8_t *data, const uint32_t len) {
     this->firmware_bin_ = data;
     this->firmware_bin_length_ = len;
-
-  void mute_speaker();
-  void unmute_speaker();
-
-  void set_mute_state(binary_sensor::BinarySensor* mute_state) {
-    this->mute_state_ = mute_state;
-  }
-
-  void set_firmware_version(text_sensor::TextSensor* firmware_version) {
-    this->firmware_version_ = firmware_version;
   }
   void set_firmware_version(uint8_t major, uint8_t minor, uint8_t patch) {
     this->firmware_bin_version_major_ = major;
@@ -149,13 +149,19 @@ class RespeakerLite : public i2c::I2CDevice, public Component {
 
   void start_dfu_update();
 
+  void set_channel_0_stage(PipelineStages channel_0_stage) { this->channel_0_stage_ = channel_0_stage; }
+  void set_channel_1_stage(PipelineStages channel_1_stage) { this->channel_1_stage_ = channel_1_stage; }
+
+  void write_pipeline_stages();
   uint8_t read_vnr();
 
+  PipelineStages read_pipeline_stage(MicrophoneChannels channel);
+
  protected:
- #ifdef USE_RESPEAKER_LITE_STATE_CALLBACK
-  CallbackManager<void(DFUAutomationState, float, RespeakerLiteUpdaterStatus)> state_callback_{};
+#ifdef USE_VOICE_KIT_STATE_CALLBACK
+  CallbackManager<void(DFUAutomationState, float, VoiceKitUpdaterStatus)> state_callback_{};
 #endif
-  RespeakerLiteUpdaterStatus dfu_update_send_block_();
+  VoiceKitUpdaterStatus dfu_update_send_block_();
   uint32_t load_buf_(uint8_t *buf, const uint8_t max_len, const uint32_t offset);
   bool firmware_bin_is_valid_() { return this->firmware_bin_ != nullptr && this->firmware_bin_length_; }
   bool version_read_();
@@ -167,13 +173,10 @@ class RespeakerLite : public i2c::I2CDevice, public Component {
   bool dfu_set_alternate_();
   bool dfu_check_if_ready_();
 
+  PipelineStages channel_0_stage_;
+  PipelineStages channel_1_stage_;
+
   GPIOPin *reset_pin_;
-  binary_sensor::BinarySensor *mute_state_{nullptr};
-  text_sensor::TextSensor *firmware_version_{nullptr};
-
-  bool get_firmware_version_();
-  void get_mic_mute_state_();
-
 
   uint8_t dfu_state_{0};
   uint8_t dfu_status_{0};
@@ -194,8 +197,8 @@ class RespeakerLite : public i2c::I2CDevice, public Component {
   uint32_t last_ready_{0};
   uint32_t status_last_read_ms_{0};
   uint32_t update_start_time_{0};
-  RespeakerLiteUpdaterStatus dfu_update_status_{UPDATE_OK};
+  VoiceKitUpdaterStatus dfu_update_status_{UPDATE_OK};
 };
 
-}  // namespace respeaker_lite
+}  // namespace voice_kit
 }  // namespace esphome

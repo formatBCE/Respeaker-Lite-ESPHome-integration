@@ -1,22 +1,20 @@
-#include "respeaker_lite.h"
+#include "voice_kit.h"
 
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
-#include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
-#include "esphome/core/hal.h"
 
 #include <cinttypes>
 
 namespace esphome {
-namespace respeaker_lite {
+namespace voice_kit {
 
-static const char *const TAG = "respeaker_lite";
-bool initialized = false;
+static const char *const TAG = "voice_kit";
 
-void RespeakerLite::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up RespeakerLite...");
+void VoiceKit::setup() {
+  ESP_LOGCONFIG(TAG, "Setting up Voice Kit...");
+
   // Reset device using the reset pin
   this->reset_pin_->setup();
   this->reset_pin_->digital_write(true);
@@ -25,7 +23,7 @@ void RespeakerLite::setup() {
   // Wait for XMOS to boot...
   this->set_timeout(3000, [this]() {
     if (!this->dfu_get_version_()) {
-      ESP_LOGE(TAG, "Communication with Respeaker Lite failed");
+      ESP_LOGE(TAG, "Communication with Voice Kit failed");
       this->mark_failed();
     } else if (!this->versions_match_() && this->firmware_bin_is_valid_()) {
       ESP_LOGW(TAG, "Expected XMOS version: %u.%u.%u; found: %u.%u.%u. Updating...", this->firmware_bin_version_major_,
@@ -33,13 +31,13 @@ void RespeakerLite::setup() {
                this->firmware_version_minor_, this->firmware_version_patch_);
       this->start_dfu_update();
     } else {
-      initialized = true;
+      this->write_pipeline_stages();
     }
   });
 }
 
-void RespeakerLite::dump_config() {
-  ESP_LOGCONFIG(TAG, "Respeaker Lite:");
+void VoiceKit::dump_config() {
+  ESP_LOGCONFIG(TAG, "Voice Kit:");
   LOG_I2C_DEVICE(this);
   LOG_PIN("  Reset Pin: ", this->reset_pin_);
   if (this->firmware_version_major_ || this->firmware_version_minor_ || this->firmware_version_patch_) {
@@ -48,7 +46,7 @@ void RespeakerLite::dump_config() {
   }
 }
 
-void RespeakerLite::loop() {
+void VoiceKit::loop() {
   switch (this->dfu_update_status_) {
     case UPDATE_IN_PROGRESS:
     case UPDATE_REBOOT_PENDING:
@@ -60,7 +58,7 @@ void RespeakerLite::loop() {
     case UPDATE_TIMEOUT:
     case UPDATE_FAILED:
     case UPDATE_BAD_STATE:
-#ifdef USE_RESPEAKER_LITE_STATE_CALLBACK
+#ifdef USE_VOICE_KIT_STATE_CALLBACK
       this->state_callback_.call(DFU_ERROR, this->bytes_written_ * 100.0f / this->firmware_bin_length_,
                                  this->dfu_update_status_);
 #endif
@@ -68,14 +66,11 @@ void RespeakerLite::loop() {
       break;
 
     default:
-      if (initialized) {
-        this->get_mic_mute_state_();
-      }
       break;
   }
 }
 
-uint8_t RespeakerLite::read_vnr() {
+uint8_t VoiceKit::read_vnr() {
   const uint8_t vnr_req[] = {CONFIGURATION_SERVICER_RESID,
                              CONFIGURATION_SERVICER_RESID_VNR_VALUE | CONFIGURATION_COMMAND_READ_BIT, 2};
   uint8_t vnr_resp[2];
@@ -93,7 +88,49 @@ uint8_t RespeakerLite::read_vnr() {
   return vnr_resp[1];
 }
 
-void RespeakerLite::start_dfu_update() {
+PipelineStages VoiceKit::read_pipeline_stage(MicrophoneChannels channel) {
+  uint8_t channel_register = CONFIGURATION_SERVICER_RESID_CHANNEL_0_PIPELINE_STAGE | CONFIGURATION_COMMAND_READ_BIT;
+  if (channel == MICROPHONE_CHANNEL_1) {
+    channel_register = CONFIGURATION_SERVICER_RESID_CHANNEL_1_PIPELINE_STAGE | CONFIGURATION_COMMAND_READ_BIT;
+  }
+
+  const uint8_t stage_req[] = {CONFIGURATION_SERVICER_RESID, channel_register, 2};
+
+  uint8_t stage_resp[2];
+
+  auto error_code = this->write(stage_req, sizeof(stage_req));
+  if (error_code != i2c::ERROR_OK) {
+    ESP_LOGE(TAG, "Failed to read stage");
+  }
+  error_code = this->read(stage_resp, sizeof(stage_resp));
+  if (error_code != i2c::ERROR_OK) {
+    ESP_LOGE(TAG, "Failed to read stage");
+  }
+
+  return static_cast<PipelineStages>(stage_resp[1]);
+}
+
+void VoiceKit::write_pipeline_stages() {
+  // Write channel 0 stage
+  uint8_t stage_set[] = {CONFIGURATION_SERVICER_RESID, CONFIGURATION_SERVICER_RESID_CHANNEL_0_PIPELINE_STAGE, 1,
+                               this->channel_0_stage_};
+
+  auto error_code = this->write(stage_set, sizeof(stage_set));
+  if (error_code != i2c::ERROR_OK) {
+    ESP_LOGE(TAG, "Failed to write chanenl 0 stage");
+  }
+
+  // Write channel 1 stage
+  stage_set[1] = CONFIGURATION_SERVICER_RESID_CHANNEL_1_PIPELINE_STAGE;
+  stage_set[3] = this->channel_1_stage_;
+
+  error_code = this->write(stage_set, sizeof(stage_set));
+  if (error_code != i2c::ERROR_OK) {
+    ESP_LOGE(TAG, "Failed to write channel 1 stage");
+  }
+}
+
+void VoiceKit::start_dfu_update() {
   if (this->firmware_bin_ == nullptr || !this->firmware_bin_length_) {
     ESP_LOGE(TAG, "Firmware invalid");
     return;
@@ -101,7 +138,7 @@ void RespeakerLite::start_dfu_update() {
 
   ESP_LOGI(TAG, "Starting update from %u.%u.%u...", this->firmware_version_major_, this->firmware_version_minor_,
            this->firmware_version_patch_);
-#ifdef USE_RESPEAKER_LITE_STATE_CALLBACK
+#ifdef USE_VOICE_KIT_STATE_CALLBACK
   this->state_callback_.call(DFU_START, 0, UPDATE_OK);
 #endif
 
@@ -118,7 +155,7 @@ void RespeakerLite::start_dfu_update() {
   this->dfu_update_status_ = this->dfu_update_send_block_();
 }
 
-RespeakerLiteUpdaterStatus RespeakerLite::dfu_update_send_block_() {
+VoiceKitUpdaterStatus VoiceKit::dfu_update_send_block_() {
   i2c::ErrorCode error_code = i2c::NO_ERROR;
   uint8_t dfu_dnload_req[MAX_XFER + 6] = {240, 1, 130,  // resid, cmd_id, payload length,
                                           0, 0};        // additional payload length (set below)
@@ -154,7 +191,7 @@ RespeakerLiteUpdaterStatus RespeakerLite::dfu_update_send_block_() {
       this->last_progress_ = now;
       float percentage = this->bytes_written_ * 100.0f / this->firmware_bin_length_;
       ESP_LOGD(TAG, "Progress: %0.1f%%", percentage);
-#ifdef USE_RESPEAKER_LITE_STATE_CALLBACK
+#ifdef USE_VOICE_KIT_STATE_CALLBACK
       this->state_callback_.call(DFU_IN_PROGRESS, percentage, UPDATE_IN_PROGRESS);
 #endif
     }
@@ -200,7 +237,7 @@ RespeakerLiteUpdaterStatus RespeakerLite::dfu_update_send_block_() {
           return UPDATE_FAILED;
         }
         ESP_LOGI(TAG, "Update complete");
-#ifdef USE_RESPEAKER_LITE_STATE_CALLBACK
+#ifdef USE_VOICE_KIT_STATE_CALLBACK
         this->state_callback_.call(DFU_COMPLETE, 100.0f, UPDATE_OK);
 #endif
         this->write_pipeline_stages();
@@ -214,7 +251,7 @@ RespeakerLiteUpdaterStatus RespeakerLite::dfu_update_send_block_() {
   return UPDATE_BAD_STATE;
 }
 
-uint32_t RespeakerLite::load_buf_(uint8_t *buf, const uint8_t max_len, const uint32_t offset) {
+uint32_t VoiceKit::load_buf_(uint8_t *buf, const uint8_t max_len, const uint32_t offset) {
   if (offset > this->firmware_bin_length_) {
     ESP_LOGE(TAG, "Invalid offset");
     return 0;
@@ -231,17 +268,17 @@ uint32_t RespeakerLite::load_buf_(uint8_t *buf, const uint8_t max_len, const uin
   return buf_len;
 }
 
-bool RespeakerLite::version_read_() {
+bool VoiceKit::version_read_() {
   return this->firmware_version_major_ || this->firmware_version_minor_ || this->firmware_version_patch_;
 }
 
-bool RespeakerLite::versions_match_() {
+bool VoiceKit::versions_match_() {
   return this->firmware_bin_version_major_ == this->firmware_version_major_ &&
          this->firmware_bin_version_minor_ == this->firmware_version_minor_ &&
          this->firmware_bin_version_patch_ == this->firmware_version_patch_;
 }
 
-bool RespeakerLite::dfu_get_status_() {
+bool VoiceKit::dfu_get_status_() {
   const uint8_t status_req[] = {DFU_CONTROLLER_SERVICER_RESID,
                                 DFU_CONTROLLER_SERVICER_RESID_DFU_GETSTATUS | DFU_COMMAND_READ_BIT, 6};
   uint8_t status_resp[6];
@@ -265,7 +302,7 @@ bool RespeakerLite::dfu_get_status_() {
   return true;
 }
 
-bool RespeakerLite::dfu_get_version_() {
+bool VoiceKit::dfu_get_version_() {
   const uint8_t version_req[] = {DFU_CONTROLLER_SERVICER_RESID,
                                  DFU_CONTROLLER_SERVICER_RESID_DFU_GETVERSION | DFU_COMMAND_READ_BIT, 4};
   uint8_t version_resp[4];
@@ -282,17 +319,15 @@ bool RespeakerLite::dfu_get_version_() {
     return false;
   }
 
-  std::string version = str_sprintf("%u.%u.%u", version_resp[1], version_resp[2], version_resp[3]);
-  ESP_LOGI(TAG, "DFU version: %s", version.c_str());
+  ESP_LOGI(TAG, "DFU version: %u.%u.%u", version_resp[1], version_resp[2], version_resp[3]);
   this->firmware_version_major_ = version_resp[1];
   this->firmware_version_minor_ = version_resp[2];
   this->firmware_version_patch_ = version_resp[3];
-  this->firmware_version_->publish_state(version);
 
   return true;
 }
 
-bool RespeakerLite::dfu_reboot_() {
+bool VoiceKit::dfu_reboot_() {
   const uint8_t reboot_req[] = {DFU_CONTROLLER_SERVICER_RESID, DFU_CONTROLLER_SERVICER_RESID_DFU_REBOOT, 1};
 
   auto error_code = this->write(reboot_req, 4);
@@ -303,7 +338,7 @@ bool RespeakerLite::dfu_reboot_() {
   return true;
 }
 
-bool RespeakerLite::dfu_set_alternate_() {
+bool VoiceKit::dfu_set_alternate_() {
   const uint8_t setalternate_req[] = {DFU_CONTROLLER_SERVICER_RESID, DFU_CONTROLLER_SERVICER_RESID_DFU_SETALTERNATE, 1,
                                       DFU_INT_ALTERNATE_UPGRADE};  // resid, cmd_id, payload length, payload data
 
@@ -315,7 +350,7 @@ bool RespeakerLite::dfu_set_alternate_() {
   return true;
 }
 
-bool RespeakerLite::dfu_check_if_ready_() {
+bool VoiceKit::dfu_check_if_ready_() {
   if (millis() >= this->status_last_read_ms_ + this->dfu_status_next_req_delay_) {
     if (!this->dfu_get_status_()) {
       return false;
@@ -332,48 +367,5 @@ bool RespeakerLite::dfu_check_if_ready_() {
   return false;
 }
 
-void RespeakerLite::get_mic_mute_state_() {
-  uint8_t mute_req[3] = {CONFIGURATION_SERVICER_RESID, 0x81, 1};
-  uint8_t mute_resp[2];
-
-  auto error_code = this->write(mute_req, sizeof(mute_req));
-  if (error_code != i2c::ERROR_OK) {
-    ESP_LOGW(TAG, "Request mic mute state failed");
-    return;
-  }
-
-  error_code = this->read(mute_resp, sizeof(mute_resp));
-  if (error_code != i2c::ERROR_OK || mute_resp[0] != 0) {
-    ESP_LOGW(TAG, "Read mic mute state failed");
-    return;
-  }
-
-  bool new_mute_state = mute_resp[1] == 0x01;
-  if (this->mute_state_ != nullptr) {
-    if (!this->mute_state_->has_state() || (this->mute_state_->state != new_mute_state)) {
-      ESP_LOGI(TAG, "Mic mute state: %d", new_mute_state);
-      this->mute_state_->publish_state(new_mute_state);
-    }
-  }
-}
-
-void RespeakerLite::mute_speaker() {
-  uint8_t mute_req[4] = {CONFIGURATION_SERVICER_RESID, 0x10, 1, 0};
-
-  auto error_code = this->write(mute_req, sizeof(mute_req));
-  if (error_code != i2c::ERROR_OK) {
-    ESP_LOGW(TAG, "Mute speaker failed");
-  }
-}
-
-void RespeakerLite::unmute_speaker() {
-  uint8_t unmute_req[4] = {CONFIGURATION_SERVICER_RESID, 0x10, 1, 1};
-
-  auto error_code = this->write(unmute_req, sizeof(unmute_req));
-  if (error_code != i2c::ERROR_OK) {
-    ESP_LOGW(TAG, "Unmute speaker failed");
-  }
-}
-
-}  // namespace respeaker_lite
+}  // namespace voice_kit
 }  // namespace esphome
