@@ -130,6 +130,7 @@ class RespeakerLite : public i2c::I2CDevice, public Component {
   void set_firmware_bin(const uint8_t *data, const uint32_t len) {
     this->firmware_bin_ = data;
     this->firmware_bin_length_ = len;
+  }
 
   void mute_speaker();
   void unmute_speaker();
