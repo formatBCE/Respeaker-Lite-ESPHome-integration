@@ -17,7 +17,7 @@ from esphome.const import (
 from esphome.core import HexInt
 
 AUTO_LOAD = [ "binary_sensor", "text_sensor" ]
-CODEOWNERS = ["@formatBCE"]
+CODEOWNERS = ["@iDJMic"]
 DEPENDENCIES = ["i2c"]
 
 CONF_MUTE_STATE= "mute_state"

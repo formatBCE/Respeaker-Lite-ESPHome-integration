@@ -19,7 +19,7 @@ substitutions:
 
 esphome:
   project: 
-    name: formatbce.Respeaker Lite Satellite
+    name: idjmic.ReSpeaker Lite Satellite
     version: 2025.3.1
   min_version: 2025.3.2
   on_boot:
@@ -118,6 +118,11 @@ psram:
   speed: 80MHz
 
 globals:
+  # Global index for our LEDs. So that switching between different animation does not lead to unwanted effects.
+  - id: global_led_animation_index
+    type: int
+    restore_value: no
+    initial_value: '0'
   - id: init_in_progress
     type: bool
     restore_value: no
@@ -410,7 +415,7 @@ binary_sensor:
                           id: play_sound
                           priority: false
                           sound_file: !lambda return id(center_button_long_press_sound);
-                - light.turn_off: led_internal
+                - light.turn_off: leds_internal
                 - event.trigger:
                     id: button_press_event
                     event_type: "long_press"
@@ -421,7 +426,7 @@ binary_sensor:
         then:
           - light.turn_on:
               brightness: 100%
-              id: led_internal
+              id: leds_internal
               effect: "Factory Reset Coming Up"
           - script.execute:
               id: play_sound
@@ -433,7 +438,7 @@ binary_sensor:
               condition:
                 lambda: return !id(factory_reset_requested);
               then:
-                - light.turn_off: led_internal
+                - light.turn_off: leds_internal
                 - script.execute:
                     id: play_sound
                     priority: true
@@ -453,66 +458,398 @@ binary_sensor:
               red: 100%
               green: 0%
               blue: 0%
-              id: led_internal
+              id: leds_internal
               effect: "none"
           - lambda: id(factory_reset_requested) = true;
 
 light:
+  # Hardware LED ring. Not used because remapping needed
   - platform: esp32_rmt_led_strip
-    id: led_internal
-    internal: true
-    rgb_order: GRB
+    id: leds_internal
     pin: GPIO1
-    num_leds: 1
+    chipset: WS2812
+    max_refresh_rate: 15ms
+    num_leds: 12
+    rgb_order: GRB
     rmt_symbols: 192
-    chipset: ws2812
-    default_transition_length: 0s
+    default_transition_length: 0ms
+
+  # Voice Assistant LED ring. Remapping of the internal LED.
+  # This light is not exposed. The device controls it
+  - platform: partition
+    id: voice_assistant_leds
+    internal: true
+    default_transition_length: 0ms
+    segments:
+      - id: leds_internal
+        from: 7
+        to: 11
+      - id: leds_internal
+        from: 0
+        to: 6
     effects:
       - addressable_lambda:
-          name: "Fast Pulse"
+          name: "Waiting for Command"
+          update_interval: 100ms
+          lambda: |-
+            auto light_color = id(led_ring).current_values;
+            Color color(light_color.get_red() * 255, light_color.get_green() * 255,
+                  light_color.get_blue() * 255);
+            for (int i = 0; i < 12; i++) {
+              if (i == id(global_led_animation_index) % 12) {
+                it[i] = color;
+              } else if (i == (id(global_led_animation_index) + 11) % 12) {
+                it[i] = color * 192;
+              } else if (i == (id(global_led_animation_index) + 10) % 12) {
+                it[i] = color * 128;
+              } else if (i == (id(global_led_animation_index) + 6) % 12) {
+                it[i] = color;
+              } else if (i == (id(global_led_animation_index) + 5) % 12) {
+                it[i] = color * 192;
+              } else if (i == (id(global_led_animation_index) + 4) % 12) {
+                it[i] = color * 128;
+              } else {
+                it[i] = Color::BLACK;
+              }
+            }
+            id(global_led_animation_index) = (id(global_led_animation_index) + 1) % 12;
+      - addressable_lambda:
+          name: "Listening For Command"
+          update_interval: 50ms
+          lambda: |-
+            auto light_color = id(led_ring).current_values;
+            Color color(light_color.get_red() * 255, light_color.get_green() * 255,
+                  light_color.get_blue() * 255);
+            for (int i = 0; i < 12; i++) {
+              if (i == id(global_led_animation_index) % 12) {
+                it[i] = color;
+              } else if (i == (id(global_led_animation_index) + 11) % 12) {
+                it[i] = color * 192;
+              } else if (i == (id(global_led_animation_index) + 10) % 12) {
+                it[i] = color * 128;
+              } else if (i == (id(global_led_animation_index) + 6) % 12) {
+                it[i] = color;
+              } else if (i == (id(global_led_animation_index) + 5) % 12) {
+                it[i] = color * 192;
+              } else if (i == (id(global_led_animation_index) + 4) % 12) {
+                it[i] = color * 128;
+              } else {
+                it[i] = Color::BLACK;
+              }
+            }
+            id(global_led_animation_index) = (id(global_led_animation_index) + 1) % 12;
+      - addressable_lambda:
+          name: "Thinking"
           update_interval: 10ms
           lambda: |-
-            static float fraction = 0.0;
-            static float step = 0.05;
-            static bool increasing = true;
-
-            auto values = id(led_internal)->current_values;
-            Color color(values.get_red() * 255, values.get_green() * 255, values.get_blue() * 255);
-            it[0].set_rgb(color.red * fraction, 
-                             color.green * fraction, 
-                             color.blue * fraction);
-            
-            fraction += (step * (increasing ? 1 : -1));
-            if (fraction > 1.0) {
-              fraction = 1.0;
-              increasing = !increasing;
-            } else if (fraction < 0.0) {
-              fraction = 0.0;
-              increasing = !increasing;
+            static uint8_t brightness_step = 0;
+            static bool brightness_decreasing = true;
+            static uint8_t brightness_step_number = 10;
+            if (initial_run) {
+              brightness_step = 0;
+              brightness_decreasing = true;
             }
-
+            auto light_color = id(led_ring).current_values;
+            Color color(light_color.get_red() * 255, light_color.get_green() * 255,
+                  light_color.get_blue() * 255);
+            for (int i = 0; i < 12; i++) {
+              if (i == id(global_led_animation_index) % 12) {
+                it[i] = color * uint8_t(255/brightness_step_number*(brightness_step_number-brightness_step));
+              } else if (i == (id(global_led_animation_index) + 6) % 12) {
+                it[i] = color * uint8_t(255/brightness_step_number*(brightness_step_number-brightness_step));
+              } else {
+                it[i] = Color::BLACK;
+              }
+            }
+            if (brightness_decreasing) {
+              brightness_step++;
+            } else {
+              brightness_step--;
+            }
+            if (brightness_step == 0 || brightness_step == brightness_step_number) {
+              brightness_decreasing = !brightness_decreasing;
+            }
       - addressable_lambda:
-          name: "Slow Pulse"
-          update_interval: 30ms
+          name: "Replying"
+          update_interval: 50ms
           lambda: |-
-            static float fraction = 0.0;
-            static float step = 0.05;
-            static bool increasing = true;
-
-            auto values = id(led_internal)->current_values;
-            Color color(values.get_red() * 255, values.get_green() * 255, values.get_blue() * 255);
-            it[0].set_rgb(color.red * fraction, 
-                             color.green * fraction, 
-                             color.blue * fraction);
-            
-            fraction += (step * (increasing ? 1 : -1));
-            if (fraction > 1.0) {
-              fraction = 1.0;
-              increasing = !increasing;
-            } else if (fraction < 0.0) {
-              fraction = 0.0;
-              increasing = !increasing;
+            id(global_led_animation_index) = (12 + id(global_led_animation_index) - 1) % 12;
+            auto light_color = id(led_ring).current_values;
+            Color color(light_color.get_red() * 255, light_color.get_green() * 255,
+                  light_color.get_blue() * 255);
+            for (int i = 0; i < 12; i++) {
+              if (i == (id(global_led_animation_index)) % 12) {
+                it[i] = color;
+              } else if (i == ( id(global_led_animation_index) + 1) % 12) {
+                it[i] = color * 192;
+              } else if (i == ( id(global_led_animation_index) + 2) % 12) {
+                it[i] = color * 128;
+              } else if (i == ( id(global_led_animation_index) + 6) % 12) {
+                it[i] = color;
+              } else if (i == ( id(global_led_animation_index) + 7) % 12) {
+                it[i] = color * 192;
+              } else if (i == ( id(global_led_animation_index) + 8) % 12) {
+                it[i] = color * 128;
+              } else {
+                it[i] = Color::BLACK;
+              }
             }
+      - addressable_lambda:
+          name: "Muted or Silent"
+          update_interval: 16ms
+          lambda: |-
+            static int8_t index = 0;
+            Color muted_color(255, 0, 0);
+            auto light_color = id(led_ring).current_values;
+            Color color(light_color.get_red() * 255, light_color.get_green() * 255,
+                  light_color.get_blue() * 255);
+            for (int i = 0; i < 12; i++) {
+              if ( light_color.get_state() ) {
+                it[i] = color;
+              } else {
+                it[i] = Color::BLACK;
+              }
+            }
+            if ( id(speaker_mute_switch).state ) {
+              it[2] = Color::BLACK;
+              it[3] = muted_color;
+              it[4] = Color::BLACK;
+              it[8] = Color::BLACK;
+              it[9] = muted_color;
+              it[10] = Color::BLACK;
+            }
+            if ( id(external_media_player).volume == 0.0f || id(external_media_player).is_muted() ) {
+              it[5] = Color::BLACK;
+              it[6] = muted_color;
+              it[7] = Color::BLACK;
+            }
+      - addressable_lambda:
+          name: "Volume Display"
+          update_interval: 50ms
+          lambda: |-
+            auto light_color = id(led_ring).current_values;
+            Color color(light_color.get_red() * 255, light_color.get_green() * 255,
+                  light_color.get_blue() * 255);
+            Color silenced_color(255, 0, 0);
+            auto volume_ratio = 12.0f * id(external_media_player).volume;
+            for (int i = 0; i < 12; i++) {
+              if (i <= volume_ratio) {
+                it[(6+i)%12] = color * min( 255.0f * (volume_ratio - i) , 255.0f ) ;
+              } else {
+                it[(6+i)%12] = Color::BLACK;
+              }
+            }
+            if (id(external_media_player).volume == 0.0f) {
+              it[6] = silenced_color;
+            }
+      - addressable_lambda:
+          name: "Center Button Touched"
+          update_interval: 16ms
+          lambda: |-
+            if (initial_run) {
+              // set voice_assistant_leds light to colors based on led_ring
+              auto led_ring_cv = id(led_ring).current_values;
+              auto va_leds_call = id(voice_assistant_leds).make_call();
+              va_leds_call.from_light_color_values(led_ring_cv);
+              va_leds_call.set_brightness( min ( max( id(led_ring).current_values.get_brightness() , 0.2f ) + 0.1f , 1.0f ) );
+              va_leds_call.set_state(true);
+              va_leds_call.perform();
+            }
+            auto light_color = id(voice_assistant_leds).current_values;
+            Color color(light_color.get_red() * 255, light_color.get_green() * 255,
+                  light_color.get_blue() * 255);
+            for (int i = 0; i < 12; i++) {
+              it[i] = color;
+            }
+      - addressable_twinkle:
+          name: "Twinkle"
+          twinkle_probability: 50%
+      - addressable_lambda:
+          name: "Error"
+          update_interval: 10ms
+          lambda: |-
+            static uint8_t brightness_step = 0;
+            static bool brightness_decreasing = true;
+            static uint8_t brightness_step_number = 10;
+            if (initial_run) {
+              brightness_step = 0;
+              brightness_decreasing = true;
+            }
+            Color error_color(255, 0, 0);
+            for (int i = 0; i < 12; i++) {
+              it[i] = error_color * uint8_t(255/brightness_step_number*(brightness_step_number-brightness_step));
+            }
+            if (brightness_decreasing) {
+              brightness_step++;
+            } else {
+              brightness_step--;
+            }
+            if (brightness_step == 0 || brightness_step == brightness_step_number) {
+              brightness_decreasing = !brightness_decreasing;
+            }
+      - addressable_lambda:
+          name: "Timer Ring"
+          update_interval: 10ms
+          lambda: |-
+            static uint8_t brightness_step = 0;
+            static bool brightness_decreasing = true;
+            static uint8_t brightness_step_number = 10;
+            if (initial_run) {
+              brightness_step = 0;
+              brightness_decreasing = true;
+            }
+            auto light_color = id(led_ring).current_values;
+            Color color(light_color.get_red() * 255, light_color.get_green() * 255,
+                  light_color.get_blue() * 255);
+            Color muted_color(255, 0, 0);
+            for (int i = 0; i < 12; i++) {
+              it[i] = color * uint8_t(255/brightness_step_number*(brightness_step_number-brightness_step));
+            }
+            if ( id(speaker_mute_switch).state ) {
+              it[3] = muted_color;
+              it[9] = muted_color;
+            }
+            if (brightness_decreasing) {
+              brightness_step++;
+            } else {
+              brightness_step--;
+            }
+            if (brightness_step == 0 || brightness_step == brightness_step_number) {
+              brightness_decreasing = !brightness_decreasing;
+            }
+      - addressable_lambda:
+          name: "Timer Tick"
+          update_interval: 100ms
+          lambda: |-
+            auto light_color = id(led_ring).current_values;
+            Color color(light_color.get_red() * 255, light_color.get_green() * 255,
+                  light_color.get_blue() * 255);
+            Color muted_color(255, 0, 0);
+            auto timer_ratio = 12.0f * id(first_active_timer).seconds_left / max(id(first_active_timer).total_seconds , static_cast<uint32_t>(1));
+            uint8_t last_led_on = static_cast<uint8_t>(ceil(timer_ratio)) - 1;
+            for (int i = 0; i < 12; i++) {
+              float brightness_dip = ( i == id(global_led_animation_index) % 12 && i != last_led_on ) ? 0.9f : 1.0f ;
+              if (i <= timer_ratio) {
+                it[i] = color * min(255.0f * brightness_dip * (timer_ratio - i) , 255.0f * brightness_dip) ;
+              } else {
+                it[i] = Color::BLACK;
+              }
+            }
+            if (id(speaker_mute_switch).state) {
+              it[2] = Color::BLACK;
+              it[3] = muted_color;
+              it[4] = Color::BLACK;
+              it[8] = Color::BLACK;
+              it[9] = muted_color;
+              it[10] = Color::BLACK;
+            }
+            id(global_led_animation_index) = (12 + id(global_led_animation_index) - 1) % 12;
+      - addressable_rainbow:
+          name: "Rainbow"
+          width: 12
+      - addressable_lambda:
+          name: "Tick"
+          update_interval: 333ms
+          lambda: |-
+            static uint8_t index = 0;
+            Color color(255, 0, 0);
+            if (initial_run) {
+              index = 0;
+            }
+            for (int i = 0; i < 12; i++) {
+              if (i <= index ) {
+                it[i] = Color::BLACK;
+              } else {
+                it[i] = color;
+              }
+            }
+            index = (index + 1) % 12;
+      - addressable_lambda:
+          name: "Factory Reset Coming Up"
+          update_interval: 1s
+          lambda: |-
+            static uint8_t index = 0;
+            Color color(255, 0, 0);
+            if (initial_run) {
+              index = 0;
+            }
+            for (int i = 0; i < 12; i++) {
+              if (i <= index ) {
+                it[i] = color;
+              } else {
+                it[i] = Color::BLACK;
+              }
+            }
+            index = (index + 1) % 12;
+      - addressable_lambda:
+          name: "Jack Plugged"
+          update_interval: 40ms
+          lambda: |-
+              static uint8_t index = 0;
+              if (initial_run) {
+                index = 0;
+              }
+              auto light_color = id(led_ring).current_values;
+              Color color(light_color.get_red() * 255, light_color.get_green() * 255,
+                    light_color.get_blue() * 255);
+              if (index <= 6) {
+                for (int i = 0; i < 12; i++) {
+                  if (i == index) {
+                    it[i] = color;
+                  } else if (i == (12 - index) % 12) {
+                    it[i] = color;
+                  } else {
+                    it[i] = Color::BLACK;
+                  }
+                }
+              }
+              index = (index + 1);
+      - addressable_lambda:
+          name: "Jack Unplugged"
+          update_interval: 40ms
+          lambda: |-
+              static uint8_t index = 0;
+              if (initial_run) {
+                index = 0;
+              }
+              auto light_color = id(led_ring).current_values;
+              Color color(light_color.get_red() * 255, light_color.get_green() * 255,
+                    light_color.get_blue() * 255);
+              if (index <= 6) {
+                for (int i = 0; i < 12; i++) {
+                  if (i == 6 - index) {
+                    it[i] = color;
+                  } else if (i == (6 + index) % 12) {
+                    it[i] = color;
+                  } else {
+                    it[i] = Color::BLACK;
+                  }
+                }
+              }
+              index = (index + 1);
+
+  # User facing LED ring. Remapping of the internal LEDs.
+  # Exposed to be used by the user.
+  - platform: partition
+    id: led_ring
+    name: LED Ring
+    entity_category: config
+    icon: "mdi:circle-outline"
+    default_transition_length: 0ms
+    restore_mode: RESTORE_DEFAULT_OFF
+    initial_state:
+      color_mode: rgb
+      brightness: 66%
+      red: 9.4%
+      green: 73.3%
+      blue: 94.9%
+    segments:
+      - id: leds_internal
+        from: 7
+        to: 11
+      - id: leds_internal
+        from: 0
+        to: 6
   # User facing LED.
   # Exposed to be used by the user.
   - platform: partition
@@ -529,36 +866,13 @@ light:
       green: 73.3%
       blue: 94.9%
     segments:
-      - id: led_internal
+      - id: leds_internal
         from: 0
         to: 0
     effects:
       - addressable_lambda:
           name: "Fast Pulse"
           update_interval: 10ms
-          lambda: |-
-            static float fraction = 0.0;
-            static float step = 0.05;
-            static bool increasing = true;
-
-            auto values = id(led_respeaker_onboard)->current_values;
-            Color color(values.get_red() * 255, values.get_green() * 255, values.get_blue() * 255);
-            it[0].set_rgb(color.red * fraction, 
-                             color.green * fraction, 
-                             color.blue * fraction);
-            
-            fraction += (step * (increasing ? 1 : -1));
-            if (fraction > 1.0) {
-              fraction = 1.0;
-              increasing = !increasing;
-            } else if (fraction < 0.0) {
-              fraction = 0.0;
-              increasing = !increasing;
-            }
-
-      - addressable_lambda:
-          name: "Slow Pulse"
-          update_interval: 30ms
           lambda: |-
             static float fraction = 0.0;
             static float step = 0.05;
@@ -652,20 +966,21 @@ script:
             id(control_leds_voice_assistant_idle_phase).execute();
           }
 
+
   # Script executed during Improv BLE
-  # Warm White slow pulse
+  # Warm White Twinkle
   - id: control_leds_improv_ble_state
     then:
       - light.turn_on:
-          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          brightness: 66%
           red: 100%
           green: 89%
           blue: 71%
-          id: led_internal
-          effect: "Slow Pulse"
+          id: voice_assistant_leds
+          effect: "Twinkle"
 
   # Script executed during initialization
-  # Fast Blue pulse if Wifi is connected, Else slow blue pulse
+  # Blue Twinkle if Wifi is connected, Else solid warm white
   - id: control_leds_init_state
     then:
       - if:
@@ -673,149 +988,138 @@ script:
             wifi.connected:
           then:
             - light.turn_on:
-                brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
-                red: 9%
-                green: 73%
-                blue: 95%
-                id: led_internal
-                effect: "Fast Pulse"
+                brightness: 66%
+                red: 9.4%
+                green: 73.3%
+                blue: 94.9%
+                id: voice_assistant_leds
+                effect: "Twinkle"
           else:
             - light.turn_on:
-                brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
-                red: 9%
-                green: 73%
-                blue: 95%
-                id: led_internal
-                effect: "Slow Pulse"
+                brightness: 66%
+                red: 100%
+                green: 89%
+                blue: 71%
+                id: voice_assistant_leds
+                effect: "none"
+
   # Script executed when the device has no connection to Home Assistant
-  # Red slow pulse (This will be visible during HA updates for example)
+  # Red Twinkle (This will be visible during HA updates for example)
   - id: control_leds_no_ha_connection_state
     then:
       - light.turn_on:
-          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          brightness: 66%
           red: 1
           green: 0
           blue: 0
-          id: led_internal
-          effect: "Slow Pulse"
+          id: voice_assistant_leds
+          effect: "Twinkle"
 
   # Script executed when the voice assistant is idle (waiting for a wake word)
-  # Nothing
+  # Nothing (Either LED ring off or LED ring on if the user decided to turn the user facing LED ring on)
   - id: control_leds_voice_assistant_idle_phase
     then:
-      - light.turn_off: led_internal
+      - light.turn_off: voice_assistant_leds
       - if:
           condition:
-            light.is_on: led_respeaker_onboard
+            light.is_on: led_ring
           then:
-            light.turn_on: led_respeaker_onboard
+            light.turn_on: led_ring
 
   # Script executed when the voice assistant is waiting for a command (After the wake word)
-  # Slow purple pulse
+  # Slow clockwise spin of the LED ring.
   - id: control_leds_voice_assistant_waiting_for_command_phase
     then:
       - light.turn_on:
-          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
-          red: 1
-          green: 0.2
-          blue: 1
-          id: led_internal
-          effect: "Slow Pulse"
+          brightness: !lambda return max( id(led_ring).current_values.get_brightness() , 0.2f );
+          id: voice_assistant_leds
+          effect: "Waiting for Command"
 
   # Script executed when the voice assistant is listening to a command
-  # Slow purple pulse
+  # Fast clockwise spin of the LED ring.
   - id: control_leds_voice_assistant_listening_for_command_phase
     then:
       - light.turn_on:
-          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
-          red: 1
-          green: 0.2
-          blue: 1
-          id: led_internal
-          effect: "Slow Pulse"
+          brightness: !lambda return max( id(led_ring).current_values.get_brightness() , 0.2f );
+          id: voice_assistant_leds
+          effect: "Listening For Command"
 
   # Script executed when the voice assistant is thinking to a command
-  # Fast purple pulse
+  # The spin stops and the 2 LEDs that are currently on and blinking indicating the commend is being processed.
   - id: control_leds_voice_assistant_thinking_phase
     then:
       - light.turn_on:
-          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
-          red: 1
-          green: 0.2
-          blue: 1
-          id: led_internal
-          effect: "Fast Pulse"
+          brightness: !lambda return max( id(led_ring).current_values.get_brightness() , 0.2f );
+          id: voice_assistant_leds
+          effect: "Thinking"
 
-  # Script executed when the voice assistant is replying to a command
-  # Slow cyan pulse
+  # Script executed when the voice assistant is thinking to a command
+  # Fast anticlockwise spin of the LED ring.
   - id: control_leds_voice_assistant_replying_phase
     then:
       - light.turn_on:
-          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
-          red: 0.2
-          green: 1
-          blue: 1
-          id: led_internal
-          effect: "Slow Pulse"
+          brightness: !lambda return max( id(led_ring).current_values.get_brightness() , 0.2f );
+          id: voice_assistant_leds
+          effect: "Replying"
 
   # Script executed when the voice assistant is in error
   # Fast Red Pulse
   - id: control_leds_voice_assistant_error_phase
     then:
       - light.turn_on:
-          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          brightness: !lambda return min ( max( id(led_ring).current_values.get_brightness() , 0.2f ) + 0.1f , 1.0f );
           red: 1
           green: 0
           blue: 0
-          id: led_internal
-          effect: "Fast Pulse"
+          id: voice_assistant_leds
+          effect: "Error"
+
+  # Script executed when the voice assistant is muted or silent
+  # The LED next to the 2 microphones turn red / one red LED next to the speaker grill
+  - id: control_leds_muted_or_silent
+    then:
+      - light.turn_on:
+          brightness: !lambda return max( id(led_ring).current_values.get_brightness() , 0.2f );
+          id: voice_assistant_leds
+          effect: "Muted or Silent"
 
   # Script executed when the voice assistant is not ready
   - id: control_leds_voice_assistant_not_ready_phase
     then:
       - light.turn_on:
-          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          brightness: 66%
           red: 1
           green: 0
           blue: 0
-          id: led_internal
-          effect: "Slow Pulse"
+          id: voice_assistant_leds
+          effect: "Twinkle"
 
   # Script executed when the center button is touched
-  # The LED turns on blue
+  # The complete LED ring turns on
   - id: control_leds_center_button_touched
     then:
       - light.turn_on:
-          brightness: !lambda return min ( max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f ) + 0.1f , 1.0f );
-          red: 0
-          green: 0
-          blue: 1
-          id: led_internal
+          brightness: !lambda return min ( max( id(led_ring).current_values.get_brightness() , 0.2f ) + 0.1f , 1.0f );
+          id: voice_assistant_leds
+          effect: "Center Button Touched"
 
   # Script executed when the timer is ringing, to control the LEDs
-  # The LED blinks green.
+  # The LED ring blinks.
   - id: control_leds_timer_ringing
     then:
       - light.turn_on:
-          brightness: !lambda return min ( max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f ) + 0.1f , 1.0f );
-          red: 0
-          green: 1
-          blue: 0
-          id: led_internal
-          effect: "Fast Pulse"
+          brightness: !lambda return min ( max( id(led_ring).current_values.get_brightness() , 0.2f ) + 0.1f , 1.0f );
+          id: voice_assistant_leds
+          effect: "Timer Ring"
 
   # Script executed when the timer is ticking, to control the LEDs
-  # Slow dim while pulse.
+  # The LEDs shows the remaining time as a fraction of the full ring.
   - id: control_leds_timer_ticking
     then:
       - light.turn_on:
-          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
-          red: 0.3
-          green: 0.3
-          blue: 0.3
-          id: led_internal
-          effect: "Slow Pulse"
-
+          brightness: !lambda return max( id(led_ring).current_values.get_brightness() , 0.2f );
+          id: voice_assistant_leds
+          effect: "Timer tick"
 
   # Script executed when the timer is ringing, to playback sounds.
   - id: ring_timer
@@ -1057,7 +1361,7 @@ respeaker_lite:
     internal: false
     id: firmware_version
   firmware:
-    url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/raw/refs/heads/main/respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin
+    url: https://github.com/idjmic/Respeaker-Lite-ESPHome-integration/raw/refs/heads/main/respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin
     version: "1.1.0"
     md5: 9297155d1bf3eb21a9d4db52a89ea0c6
     on_begin:
@@ -1066,7 +1370,7 @@ respeaker_lite:
           red: 50%
           green: 50%
           blue: 50%
-          id: led_internal
+          id: leds_internal
           effect: "Slow Pulse"
     on_end:
       - light.turn_on:
@@ -1074,27 +1378,27 @@ respeaker_lite:
           red: 0%
           green: 100%
           blue: 0%
-          id: led_internal
+          id: leds_internal
           effect: "Fast Pulse"
       - delay: 3s
       - light.turn_off:
-          id: led_internal
+          id: leds_internal
     on_error:
       - light.turn_on:
           brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
           red: 100%
           green: 0%
           blue: 0%
-          id: led_internal
+          id: leds_internal
           effect: "Fast Pulse"
       - delay: 3s
       - light.turn_off:
-          id: led_internal
+          id: leds_internal
 
 external_components:
   - source:
       type: git
-      url: https://github.com/esphome/home-assistant-voice-pe
+      url: https://github.com/idjmic/home-assistant-voice-pe
       ref: dev
     components:
       - micro_wake_word
@@ -1103,14 +1407,14 @@ external_components:
     refresh: 0s
   - source:
       type: git
-      url: https://github.com/formatBCE/home-assistant-voice-pe
+      url: https://github.com/idjmic/home-assistant-voice-pe
       ref: 48kHz_mic_support
     components:
       - nabu_microphone
     refresh: 0s
   - source:
       type: git
-      url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration
+      url: https://github.com/idjmic/Respeaker-Lite-ESPHome-integration
       ref: main
     components: 
       - respeaker_lite
