@@ -36,6 +36,8 @@ __* Thanks to Mike aka @mikey60 and his fork to nabu_microphone, this project is
 - drop-down with wake word selection: works
 - added switches to turn off button sounds, mute/unmute sounds
 - added sensors for next device timer properties (time is updated once per 5 sec, name is available if set)
+- *(since 2025.4.1)* TTS URI sensor was replaced with event `esphome.tts_uri`. Please check your automations, if you were basing them on sensor state
+- *(since 2025.4.1)* added daily alarm functionality, read more on it [here](readme/alarms.md)
 
 ## DFU software auto-update
 Since version 2025.2.2, the firmware includes corresponding DFU firmware for Respeaker Lite board. On first start after update, new firmware will be installed to Respeaker automatically. You will see Respeaker LED flashing yellow, while installing, and green on successful install. So now there's no need to update DFU firmware. Woohoo!
