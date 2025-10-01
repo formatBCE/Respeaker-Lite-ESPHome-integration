@@ -16,12 +16,21 @@ substitutions:
   voice_assist_error_phase_id: '11'
   # Change this to true in case you ahve a hidden SSID at home.
   hidden_ssid: "false"
+  # Substitutions for audio files
+  mute_switch_on_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/mute_switch_on.flac
+  mute_switch_off_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/mute_switch_off.flac
+  timer_finished_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+  wake_word_triggered_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/wake_word_triggered.flac
+  center_button_press_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/center_button_press.flac
+  center_button_double_press_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/center_button_double_press.flac
+  center_button_triple_press_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/center_button_triple_press.flac
+  center_button_long_press_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/center_button_long_press.flac
 
 esphome:
   project: 
     name: formatbce.Respeaker Lite Satellite
-    version: 2025.7.0
-  min_version: 2025.6.2
+    version: 2025.10.0
+  min_version: 2025.9.3
   on_boot:
     - priority: 375
       then:
@@ -132,6 +141,7 @@ api:
     - script.execute: control_leds
   on_client_disconnected:
     - script.execute: control_leds
+  encryption:
 
 # Uncomment this, if you have problems with text-to-speech because of Home Assistant HTTPS internal URL
 # http_request:
@@ -234,6 +244,7 @@ switch:
     id: mic_mute_switch
     name: Mic mute
     icon: mdi:microphone-off
+    optimistic: false
     lambda: |-
       if (id(mute_state).state) {
         return true;
@@ -263,9 +274,17 @@ switch:
                 priority: false
                 sound_file: !lambda return id(mute_switch_off_sound);
     turn_on_action:
-      - switch.turn_on: mute_toggle
+      - if:
+          condition:
+            lambda: return !id(mute_state).state;
+          then:
+            - switch.turn_on: mute_toggle
     turn_off_action:
-      - switch.turn_on: mute_toggle
+      - if:
+          condition:
+            lambda: return id(mute_state).state;
+          then:
+            - switch.turn_on: mute_toggle
   # Button click Sounds Switch.
   - platform: template
     id: button_sound
@@ -1182,13 +1201,13 @@ media_player:
               duration: 1.0s
     files:
       - id: center_button_press_sound
-        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/center_button_press.flac
+        file: ${center_button_press_sound_file}
       - id: center_button_double_press_sound
-        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/center_button_double_press.flac
+        file: ${center_button_double_press_sound_file}
       - id: center_button_triple_press_sound
-        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/center_button_triple_press.flac
+        file: ${center_button_triple_press_sound_file}
       - id: center_button_long_press_sound
-        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/center_button_long_press.flac
+        file: ${center_button_long_press_sound_file}
       - id: factory_reset_initiated_sound
         file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/factory_reset_initiated.mp3
       - id: factory_reset_cancelled_sound
@@ -1196,13 +1215,13 @@ media_player:
       - id: factory_reset_confirmed_sound
         file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/factory_reset_confirmed.mp3
       - id: mute_switch_on_sound
-        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/mute_switch_on.flac
+        file: ${mute_switch_on_sound_file}
       - id: mute_switch_off_sound
-        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/mute_switch_off.flac
+        file: ${mute_switch_off_sound_file}
       - id: timer_finished_sound
-        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+        file: ${timer_finished_sound_file}
       - id: wake_word_triggered_sound
-        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/wake_word_triggered.flac
+        file: ${wake_word_triggered_sound_file}
       - id: error_cloud_expired
         file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/error_cloud_expired.mp3
 
