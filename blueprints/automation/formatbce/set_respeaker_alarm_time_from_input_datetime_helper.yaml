@@ -1,0 +1,41 @@
+blueprint:
+  name: Set Respeaker Alarm Time from Time Helper
+  domain: automation
+  input:
+    datetime_helper:
+      name: Datetime Helper
+      description: The input_datetime helper that triggers the alarm time update. Must have time.
+      selector:
+        entity:
+          filter:
+            - domain: input_datetime
+    esphome_device:
+      name: Respeaker Device
+      description: The ESPHome device with set_alarm_time service
+      selector:
+        device:
+          entity:
+            - domain: assist_satellite
+          filter:
+            - manufacturer: formatbce
+              model: Respeaker Lite Satellite
+            - manufacturer: formatbce
+              model: Koala Satellite
+            - manufacturer: formatbce
+              model: Respeaker XVF3800 Satellite
+
+variables:
+  esphome_device: !input esphome_device
+
+triggers:
+  - trigger: state
+    entity_id: !input datetime_helper
+
+actions:
+  - action: "esphome.{{ device_attr(esphome_device, 'name') | slugify }}_set_alarm_time"
+    data:
+      alarm_time_hh_mm: >-
+        {{ trigger.to_state.attributes.hour }}:{{ trigger.to_state.attributes.minute }}
+
+
+mode: single
