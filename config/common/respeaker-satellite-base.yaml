@@ -1108,6 +1108,14 @@ script:
           event: esphome.stt_text
           data:
             text: !lambda return stt_text;
+  - id: send_tts_text_event
+    parameters:
+      tts_text: string
+    then:
+      - homeassistant.event:
+          event: esphome.tts_text
+          data:
+            text: !lambda return tts_text;
   - id: publish_current_time
     then:
       - lambda: |-
@@ -1589,6 +1597,9 @@ voice_assistant:
           # The intent_progress trigger didn't start the TTS Reponse
           lambda: 'return id(voice_assistant_phase) != ${voice_assist_replying_phase_id};'
         then:
+          - script.execute:
+              id: send_tts_text_event
+              tts_text: !lambda 'return x;'
           - text_sensor.template.publish:
               id: text_response
               state: !lambda return x;
