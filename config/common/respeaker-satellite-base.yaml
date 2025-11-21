@@ -697,32 +697,6 @@ text_sensor:
     id: current_time
     icon: mdi:clock
 
-  - id: text_request
-    platform: template
-    name: "Text Request"
-    on_value:
-      lambda: |-
-        if(id(text_request).state.length()>245) {
-          std::string name = id(text_request).state.c_str();
-          std::string truncated = esphome::str_truncate(name.c_str(),245);
-          id(text_request).state = (truncated+" ...").c_str();
-        }
-
-  - id: text_response
-    platform: template
-    name: "Text Response"
-    on_value:
-      lambda: |-
-        if(id(text_response).state.length()>245) {
-          std::string name = id(text_response).state.c_str();
-          std::string truncated = esphome::str_truncate(name.c_str(),245);
-          id(text_response).state = (truncated+" ...").c_str();
-        }
-  - platform: template
-    id: voice_assistant_phase_sensor
-    name: "Voice Assistant Phase ID"
-    update_interval: never
-
 event:
   # Event entity exposed to the user to automate on complex center button presses.
   # The simple press is not exposed as it is used to control the device itself.
@@ -1099,6 +1073,7 @@ script:
       - homeassistant.event:
           event: esphome.tts_uri
           data:
+            node: ${name}
             uri: !lambda return tts_uri;
   - id: send_stt_text_event
     parameters:
@@ -1107,6 +1082,7 @@ script:
       - homeassistant.event:
           event: esphome.stt_text
           data:
+            node: ${name}
             text: !lambda return stt_text;
   - id: send_tts_text_event
     parameters:
@@ -1115,25 +1091,25 @@ script:
       - homeassistant.event:
           event: esphome.tts_text
           data:
+            node: ${name}
             text: !lambda return tts_text;
+  - id: set_phase
+    parameters:
+      phase: int
+    then:
+      - lambda: id(voice_assistant_phase) = phase;
+      - homeassistant.event:
+          event: esphome.phase_id
+          data:
+            node: ${name}
+            phase: !lambda return phase;
+
   - id: publish_current_time
     then:
       - lambda: |-
           // Publish current time
           auto time_now = id(homeassistant_time).now();
           id(current_time).publish_state(time_now.strftime("%H:%M"));
-
-  - id: set_phase
-    parameters:
-      phase: int
-    then:
-      - lambda: id(voice_assistant_phase) = phase;
-      - text_sensor.template.publish:
-          id: voice_assistant_phase_sensor
-          state: !lambda |-
-            char buf[8];
-            snprintf(buf, sizeof(buf), "%d", phase);
-            return std::string(buf);
 
   - id: handle_screen_tap
     then:
@@ -1563,12 +1539,6 @@ voice_assistant:
         id: set_phase
         phase: ${voice_assist_waiting_for_command_phase_id}
     - script.execute: control_leds
-    - text_sensor.template.publish:
-        id: text_request
-        state: "..."
-    - text_sensor.template.publish:
-        id: text_response
-        state: "..."
   on_stt_vad_start:
     - script.execute:
         id: set_phase
@@ -1600,9 +1570,6 @@ voice_assistant:
           - script.execute:
               id: send_tts_text_event
               tts_text: !lambda 'return x;'
-          - text_sensor.template.publish:
-              id: text_response
-              state: !lambda return x;
           - script.execute:
               id: set_phase
               phase: ${voice_assist_replying_phase_id}
@@ -1617,10 +1584,6 @@ voice_assistant:
     - script.execute:
         id: send_stt_text_event
         stt_text: !lambda 'return x;'
-    - text_sensor.template.publish:
-        id: text_request
-        state: !lambda return x;
-    
   # When the voice assistant ends ...
   on_end:
     - wait_until:
