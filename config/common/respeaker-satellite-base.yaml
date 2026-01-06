@@ -34,7 +34,7 @@ substitutions:
 esphome:
   project: 
     name: formatbce.Respeaker Lite Satellite
-    version: 2025.12.1
+    version: 2026.1.1
   min_version: 2025.12.0
   on_boot:
     - priority: 375
@@ -1027,6 +1027,10 @@ script:
   #   This allows us to prevent having the deactivation of the stop word before its own activation.
   - id: activate_stop_word_once
     then:
+      - wait_until:
+          condition:
+            media_player.is_announcing:
+              id: external_media_player
       - delay: 1s
       # Enable stop wake word
       - if:
@@ -1353,7 +1357,7 @@ external_components:
       # https://github.com/esphome/esphome/pull/12429
       type: git
       url: https://github.com/esphome/esphome
-      ref: 627572d9aa0c372f4ca8adcbdaf68c1c2e65b84c
+      ref: f5c1a8111df78e32d07d7a7bb800018808cdc0e7
     refresh: 0s
     components: [file, http_request, media_source, speaker_source]
 
