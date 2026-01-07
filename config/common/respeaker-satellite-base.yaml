@@ -1090,6 +1090,7 @@ script:
       - homeassistant.event:
           event: esphome.tts_uri
           data:
+            node: ${name}
             uri: !lambda return tts_uri;
   - id: send_stt_text_event
     parameters:
@@ -1098,13 +1099,83 @@ script:
       - homeassistant.event:
           event: esphome.stt_text
           data:
+            node: ${name}
             text: !lambda return stt_text;
+  - id: send_tts_text_event
+    parameters:
+      tts_text: string
+    then:
+      - homeassistant.event:
+          event: esphome.tts_text
+          data:
+            node: ${name}
+            text: !lambda return tts_text;
+  - id: set_phase
+    parameters:
+      phase: int
+    then:
+      - lambda: id(voice_assistant_phase) = phase;
+      - homeassistant.event:
+          event: esphome.phase_id
+          data:
+            node: ${name}
+            phase: !lambda return phase;
+
   - id: publish_current_time
     then:
       - lambda: |-
           // Publish current time
           auto time_now = id(homeassistant_time).now();
           id(current_time).publish_state(time_now.strftime("%H:%M"));
+
+  - id: handle_screen_tap
+    then:
+      - if:
+          condition:
+            lambda: return !id(init_in_progress);
+          then:
+            - if:
+                condition:
+                  switch.is_on: timer_ringing
+                then:
+                  - switch.turn_off: timer_ringing
+                else:
+                  - if:
+                      condition:
+                        voice_assistant.is_running:
+                      then:
+                        - voice_assistant.stop:
+                      else:
+                        - if:
+                            condition:
+                              media_player.is_announcing:
+                            then:
+                              media_player.stop:
+                                announcement: true
+                            else:
+                              - if:
+                                  condition:
+                                    media_player.is_playing:
+                                  then:
+                                    - media_player.pause:
+                                  else:
+                                    - if:
+                                        condition:
+                                          and:
+                                            - switch.is_off: mic_mute_switch
+                                            - not:
+                                                voice_assistant.is_running
+                                        then:
+                                          - if:
+                                              condition:
+                                                switch.is_on: button_sound
+                                              then:
+                                                - script.execute:
+                                                    id: play_sound
+                                                    priority: true
+                                                    sound_file: !lambda return id(center_button_press_sound);
+                                                - delay: 300ms
+                                          - voice_assistant.start:
 
 i2s_audio:
   - id: i2s_output
@@ -1500,11 +1571,15 @@ voice_assistant:
           - switch.turn_off: mic_mute_switch
     - lambda: id(init_in_progress) = false;
     - micro_wake_word.start:
-    - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+    - script.execute:
+        id: set_phase
+        phase: ${voice_assist_idle_phase_id}
     - script.execute: control_leds
   on_client_disconnected:
     - voice_assistant.stop:
-    - lambda: id(voice_assistant_phase) = ${voice_assist_not_ready_phase_id};
+    - script.execute:
+        id: set_phase
+        phase: ${voice_assist_not_ready_phase_id}
     - script.execute: control_leds
   on_error:
     # Only set the error phase if the error code is different than duplicate_wake_up_detected or stt-no-text-recognized
@@ -1516,7 +1591,9 @@ voice_assistant:
             - lambda: return code != "duplicate_wake_up_detected";
             - lambda: return code != "stt-no-text-recognized";
         then:
-          - lambda: id(voice_assistant_phase) = ${voice_assist_error_phase_id};
+          - script.execute:
+              id: set_phase
+              phase: ${voice_assist_error_phase_id}
           - script.execute: control_leds
     # If the error code is cloud-auth-failed, serve a local audio file guiding the user.
     - if:
@@ -1534,13 +1611,19 @@ voice_assistant:
         decibel_reduction: 20  # Number of dB quieter; higher implies more quiet, 0 implies full volume
         duration: 0.0s  # The duration of the transition (default is no transition)
   on_listening:
-    - lambda: id(voice_assistant_phase) = ${voice_assist_waiting_for_command_phase_id};
+    - script.execute:
+        id: set_phase
+        phase: ${voice_assist_waiting_for_command_phase_id}
     - script.execute: control_leds
   on_stt_vad_start:
-    - lambda: id(voice_assistant_phase) = ${voice_assist_listening_for_command_phase_id};
+    - script.execute:
+        id: set_phase
+        phase: ${voice_assist_listening_for_command_phase_id}
     - script.execute: control_leds
   on_stt_vad_end:
-    - lambda: id(voice_assistant_phase) = ${voice_assist_thinking_phase_id};
+    - script.execute:
+        id: set_phase
+        phase: ${voice_assist_thinking_phase_id}
     - script.execute: control_leds
   on_intent_progress:
     - if:
@@ -1548,7 +1631,9 @@ voice_assistant:
           # A nonempty x variable means a streaming TTS url was sent to the media player
           lambda: 'return !x.empty();'
         then:
-          - lambda: id(voice_assistant_phase) = ${voice_assist_replying_phase_id};
+          - script.execute:
+              id: set_phase
+              phase: ${voice_assist_replying_phase_id}
           - script.execute: control_leds
           # Start a script that would potentially enable the stop word if the response is longer than a second
           - script.execute: activate_stop_word_once
@@ -1558,7 +1643,12 @@ voice_assistant:
           # The intent_progress trigger didn't start the TTS Reponse
           lambda: 'return id(voice_assistant_phase) != ${voice_assist_replying_phase_id};'
         then:
-          - lambda: id(voice_assistant_phase) = ${voice_assist_replying_phase_id};
+          - script.execute:
+              id: send_tts_text_event
+              tts_text: !lambda 'return x;'
+          - script.execute:
+              id: set_phase
+              phase: ${voice_assist_replying_phase_id}
           - script.execute: control_leds
           # Start a script that would potentially enable the stop word if the response is longer than a second
           - script.execute: activate_stop_word_once
@@ -1570,7 +1660,6 @@ voice_assistant:
     - script.execute:
         id: send_stt_text_event
         stt_text: !lambda 'return x;'
-    
   # When the voice assistant ends ...
   on_end:
     - wait_until:
@@ -1588,7 +1677,9 @@ voice_assistant:
         then:
           - delay: 1s
     # Reset the voice assistant phase id and reset the LED animations.
-    - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+    - script.execute:
+        id: set_phase
+        phase: ${voice_assist_idle_phase_id}
     - script.execute: control_leds
   on_timer_finished:
     - switch.turn_on: timer_ringing
@@ -1630,6 +1721,11 @@ button:
     entity_category: config
     disabled_by_default: true
     icon: "mdi:restart"
+  - platform: template
+    name: "Virtual Touch"
+    id: virtual_touch
+    on_press:
+      - script.execute: handle_screen_tap
 
 debug:
   update_interval: 5s
