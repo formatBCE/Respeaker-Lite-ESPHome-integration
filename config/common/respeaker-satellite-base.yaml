@@ -34,8 +34,8 @@ substitutions:
 esphome:
   project: 
     name: formatbce.Respeaker Lite Satellite
-    version: 2026.1.1
-  min_version: 2025.12.0
+    version: 2026.1.2
+  min_version: 2026.1.0
   on_boot:
     - priority: 375
       then:
@@ -75,7 +75,7 @@ esp32:
   flash_size: 8MB
   framework:
     type: esp-idf
-    version: 5.5.1
+    version: recommended
     sdkconfig_options:
       CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
       CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
@@ -302,7 +302,7 @@ switch:
   # Mute Sound Switch.
   - platform: template
     id: mute_sound
-    name: Mute/unmute sound
+    name: Mute-unmute sound
     icon: "mdi:bullhorn"
     entity_category: config
     optimistic: true
@@ -1065,7 +1065,7 @@ script:
               // Trigger action if current time matches alarm time
               auto time_now = id(homeassistant_time).now();
               if (time_now.hour == alarm_hour && time_now.minute == alarm_minute) {
-                auto action = id(alarm_action).state;
+                auto action = id(alarm_action).current_option();
                 if (action == "Play sound") {
                   id(timer_ringing).turn_on();
                 } else if (action == "Send event") {
@@ -1327,19 +1327,19 @@ external_components:
       # https://github.com/esphome/esphome/pull/12253
       type: git
       url: https://github.com/esphome/esphome
-      ref: 0fe230114c80b6d3378f04c777baadee178e40ad
+      ref: 7f34908569650e5a8b8c83e6bf89fea561218880
     components: [mixer]
   - source:
       # https://github.com/esphome/esphome/pull/12254
       type: git
       url: https://github.com/esphome/esphome
-      ref: 1ab4b990092ae063a16cb1511a188c536fdb336e
+      ref: 6006b896a691ad38d8045ac67564c168973d1a1d
     components: [resampler]
   - source:
       # https://github.com/esphome/esphome/pull/12256
       type: git
       url: https://github.com/esphome/esphome
-      ref: 047ba60f01af84513f8d5aabaa2a53074facee8f
+      ref: 9148832ea4e54907bad71a24d4ced1ce6c862433
     components: [audio]
   - source:
       # https://github.com/esphome/esphome/pull/12258
@@ -1351,13 +1351,13 @@ external_components:
       # https://github.com/esphome/esphome/pull/12284
       type: git
       url: https://github.com/esphome/esphome
-      ref: 71c8c6bdfc8006902eb0ea7b15bc86c575cef9be
+      ref: a6c0a861a014e64c67d46115eba8e5370777b80a
     components: [mdns, sendspin]
   - source:
       # https://github.com/esphome/esphome/pull/12429
       type: git
       url: https://github.com/esphome/esphome
-      ref: f5c1a8111df78e32d07d7a7bb800018808cdc0e7
+      ref: 928204066ce0082404573ea1c6a0b58aeebbd7c6
     refresh: 0s
     components: [file, http_request, media_source, speaker_source]
 
