@@ -130,6 +130,7 @@ OTA_RESPEAKER_LITE_FLASH_ACTION_SCHEMA = cv.Schema(
     "respeaker_lite.flash",
     RespeakerLiteFlashAction,
     OTA_RESPEAKER_LITE_FLASH_ACTION_SCHEMA,
+    synchronous=False,
 )
 async def respeaker_lite_flash_action_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
