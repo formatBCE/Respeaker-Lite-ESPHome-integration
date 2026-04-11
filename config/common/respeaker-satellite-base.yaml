@@ -1347,6 +1347,12 @@ external_components:
       ref: ff8ce89556748509d7ee8724e12d9d43d3c8c1e8
     refresh: 0s
     components: [http_request]
+  - source: github://pr#15628
+    # Workaround for "Failed to allocate tensors for the streaming model":
+    # https://github.com/esphome/esphome/issues/15603#issuecomment-4224931948
+    refresh: 0s
+    components:
+      - micro_wake_word
 
 audio_dac:
   - platform: aic3204
