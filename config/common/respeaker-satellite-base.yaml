@@ -137,11 +137,6 @@ api:
     - script.execute: control_leds
   encryption:
 
-ota:
-  - platform: esphome
-    id: ota_esphome
-    password: !secret ota_password
-
 i2c:
   - id: internal_i2c
     sda: GPIO5
