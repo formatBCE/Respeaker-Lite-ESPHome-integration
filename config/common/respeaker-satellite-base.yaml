@@ -377,6 +377,9 @@ binary_sensor:
     pin:
       number: GPIO3 # D2
       inverted: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
     name: "User button"
     on_press:
       - if:
@@ -741,6 +744,7 @@ script:
   # For the sake of simplicity and re-usability, the script calls child scripts defined below.
   # This script will be called every time one of these conditions is changing.
   - id: control_leds
+    mode: restart
     then:
       - lambda: |
           id(check_if_timers_active).execute();
@@ -1042,6 +1046,7 @@ script:
   #   Becasue we want to stop the sequence if the TTS step is faster than that.
   #   This allows us to prevent having the deactivation of the stop word before its own activation.
   - id: activate_stop_word_once
+    mode: restart
     then:
       - wait_until:
           condition:
