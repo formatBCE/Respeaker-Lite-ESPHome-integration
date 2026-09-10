@@ -663,6 +663,9 @@ light:
           name: "Fast Pulse"
           update_interval: 10ms
           lambda: |-
+            // Stay quiet while the parent light drives a status effect on the same pixel.
+            if (id(led_internal)->current_values.is_on())
+              return;
             static float fraction = 0.0;
             static float step = 0.05;
             static bool increasing = true;
@@ -686,6 +689,9 @@ light:
           name: "Slow Pulse"
           update_interval: 30ms
           lambda: |-
+            // Stay quiet while the parent light drives a status effect on the same pixel.
+            if (id(led_internal)->current_values.is_on())
+              return;
             static float fraction = 0.0;
             static float step = 0.05;
             static bool increasing = true;
