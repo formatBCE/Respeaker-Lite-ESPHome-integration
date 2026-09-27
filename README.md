@@ -21,8 +21,11 @@ __* Thanks to Mike aka @mikey60 and his fork to nabu_microphone, this project is
 1. Get Respeaker Lite with ESP32 soldered to it (you may solder it yourself, pins on the back can remain dry, they're not used).
 2. [Solder USR to D2 and MUTE to D3 pins](https://wiki.seeedstudio.com/respeaker_button/). _**ATTENTION! This step is mandatory, as without it the buttons on satellite won't work as intended.**_
 3. [Flash 48kHz I2S firmware of version **not lower than 1.1.0** to the XMOS board](https://wiki.seeedstudio.com/xiao_respeaker/#flash-the-i2s-firmware) (pay attention to USB port, you need the main board port, not ESP32 one). Make sure you're using 48kHz version, as 16kHz version won't work with this repo. You can use included [firmware file](/respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin) to be sure.
-5. Flash ESPHome firmware (YAML included, adjust `/config/respeaker-satellite-dashboard-example.yaml` to your needs) to ESP32 (use its port).
-6. Add device to Home Assistant.
+4. Flash the ESPHome firmware to the ESP32. Use the ESP32 USB port.
+   - Copy [the example configuration](/config/respeaker-satellite-dashboard-example.yaml) into ESPHome, and change it for your device.
+   - You do not need to download other files. The example gets the base configuration from this GitHub repository.
+   - ESPHome checks the repository for changes one time each day.
+5. Add device to Home Assistant.
 
 ### Here are also some [useful blueprints to use with your satellite](readme/blueprints.md)
 
