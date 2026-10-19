@@ -1,0 +1,238 @@
+# =============================================================================
+# ReSpeaker Lite board — hardware package
+#
+# The ESP32-S3, the I2C bus, the I2S audio, the microphones, the speaker
+# chain, the AIC3204 DAC, and the XMOS XU316 (mute and firmware update).
+#
+# Do not change the pins. The board layout sets them.
+# =============================================================================
+
+substitutions:
+  # Release of this repository: a tag such as 2026.9.1, a branch, or a commit.
+  # It selects the respeaker_lite component, the wake word model, and the XMOS
+  # firmware. Each release sets it to its own tag, so a pinned package stays
+  # consistent. Set it to "main" to follow the newest code.
+  respeaker_lite_ref: 2026.9.2
+  # Ref of the patched i2s_audio fork. The stock component does not work.
+  i2s_audio_ref: respeaker_microphone
+
+esphome:
+  on_shutdown:
+    then:
+      # Prevent loud noise on software restart
+      - lambda: id(respeaker).mute_speaker();
+
+esp32:
+  board: esp32-s3-devkitc-1
+  cpu_frequency: 240MHz
+  variant: esp32s3
+  framework:
+    type: esp-idf
+    version: recommended
+    sdkconfig_options:
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+      CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+
+      # Moves instructions and read only data from flash into PSRAM on boot.
+      # Both enabled allows instructions to execute while a flash operation is in progress without needing to be placed in IRAM.
+      # Considerably speeds up mWW at the cost of using more PSRAM.
+      CONFIG_SPIRAM_RODATA: "y"
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
+
+      CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+      CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"  # TLS1.3 support isn't enabled by default in IDF 5.1.5
+
+i2c:
+  - id: internal_i2c
+    sda: GPIO5
+    scl: GPIO6
+    frequency: 400kHz
+
+psram:
+  mode: octal
+  speed: 80MHz
+  ignore_not_found: false  # The VPE has PSRAM, so this is safe. Allows configuring WiFi driver to use more resources (done automatically by the speaker media player)
+
+switch:
+  # Hardware speaker mute
+  - platform: template
+    id: speaker_mute_switch
+    name: Speaker mute
+    icon: mdi:volume-mute
+    internal: true
+    optimistic: true
+    turn_on_action:
+      - lambda: id(respeaker).mute_speaker();
+    turn_off_action:
+      - lambda: id(respeaker).unmute_speaker();
+  # stateless momentary mic mute switch
+  - platform: gpio
+    internal: true
+    pin: 
+      number: GPIO4 # D3
+      inverted: true
+    id: mute_toggle
+    on_turn_on:
+      - delay: 300ms
+      - switch.turn_off: mute_toggle
+  # stateful user facing mic mute switch
+  - platform: template
+    id: mic_mute_switch
+    name: Mic mute
+    icon: mdi:microphone-off
+    optimistic: false
+    lambda: |-
+      if (id(mute_state).state) {
+        return true;
+      } else {
+        return false;
+      }
+    on_turn_on:
+      - if:
+          condition:
+            and:
+              - lambda: return !id(init_in_progress);
+              - switch.is_on: mute_sound
+          then:
+            - script.execute:
+                id: play_sound
+                priority: false
+                sound_file: "mute_switch_on_sound"
+    on_turn_off:
+      - if:
+          condition:
+            and:
+              - lambda: return !id(init_in_progress);
+              - switch.is_on: mute_sound
+          then:
+            - script.execute:
+                id: play_sound
+                priority: false
+                sound_file: "mute_switch_off_sound"
+    turn_on_action:
+      - if:
+          condition:
+            lambda: return !id(mute_state).state;
+          then:
+            - switch.turn_on: mute_toggle
+    turn_off_action:
+      - if:
+          condition:
+            lambda: return id(mute_state).state;
+          then:
+            - switch.turn_on: mute_toggle
+
+i2s_audio:
+  - id: i2s_output
+    i2s_lrclk_pin: 
+      number: GPIO7
+      allow_other_uses: true
+    i2s_bclk_pin:  
+      number: GPIO8
+      allow_other_uses: true
+    i2s_mclk_pin:  
+      number: GPIO9
+      allow_other_uses: true
+
+  - id: i2s_input
+    i2s_lrclk_pin:  
+      number: GPIO7
+      allow_other_uses: true
+    i2s_bclk_pin:  
+      number: GPIO8
+      allow_other_uses: true
+    i2s_mclk_pin:  
+      number: GPIO9
+      allow_other_uses: true
+
+microphone:
+  - platform: i2s_audio
+    id: i2s_mics
+    i2s_din_pin: GPIO44
+    adc_type: external
+    pdm: false
+    sample_rate: 48000
+    bits_per_sample: 32bit
+    i2s_mode: secondary
+    i2s_audio_id: i2s_input
+    channel: stereo
+      
+speaker:
+  # Hardware speaker output
+  - platform: i2s_audio
+    id: i2s_audio_speaker
+    sample_rate: 48000
+    i2s_mode: secondary
+    i2s_dout_pin: GPIO43
+    bits_per_sample: 32bit
+    i2s_audio_id: i2s_output
+    dac_type: external
+    channel: stereo
+    timeout: never
+    buffer_duration: 100ms
+    audio_dac: aic3204_dac
+
+  # Virtual speakers to combine the announcement and media streams together into one output
+  - platform: mixer
+    id: mixing_speaker
+    output_speaker: i2s_audio_speaker
+    num_channels: 2
+    task_stack_in_psram: true
+    source_speakers:
+      - id: announcement_mixing_input
+        timeout: never
+      - id: media_mixing_input
+        timeout: never
+
+  # Virtual speakers to resample each pipelines' audio, if necessary, as the mixer speaker requires the same sample rate
+  - platform: resampler
+    id: announcement_resampling_speaker
+    output_speaker: announcement_mixing_input
+    sample_rate: 48000
+    bits_per_sample: 16
+  - platform: resampler
+    id: media_resampling_speaker
+    output_speaker: media_mixing_input
+    sample_rate: 48000
+    bits_per_sample: 16
+
+respeaker_lite:
+  id: respeaker
+  reset_pin: GPIO2
+  mute_state:
+    internal: true
+    id: mute_state
+  firmware_version:
+    icon: mdi:application-cog
+    name: XMOS firmware version
+    internal: false
+    id: firmware_version
+  firmware:
+    url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/raw/${respeaker_lite_ref}/respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin
+    version: "1.1.0"
+    md5: 9297155d1bf3eb21a9d4db52a89ea0c6
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/formatBCE/esphome
+      ref: ${i2s_audio_ref}
+    components:
+      - i2s_audio
+    refresh: 0s
+  - source:
+      type: git
+      url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration
+      ref: ${respeaker_lite_ref}
+    components: 
+      - respeaker_lite
+    refresh: 0s
+
+audio_dac:
+  - platform: aic3204
+    id: aic3204_dac
+    i2c_id: internal_i2c

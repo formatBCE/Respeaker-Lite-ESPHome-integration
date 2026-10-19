@@ -1,0 +1,452 @@
+# =============================================================================
+# Respeaker Lite satellite — device package
+#
+# The XIAO ESP32-S3 on the ReSpeaker Lite: the flash size, the user button
+# pin, and the single RGB LED with all its status effects.
+# =============================================================================
+
+esphome:
+  project: 
+    name: formatbce.Respeaker Lite Satellite
+    version: 2026.9.2
+
+esp32:
+  flash_size: 8MB
+
+binary_sensor:
+  # User Button. Used for many things (See on_multi_click)
+  - platform: gpio
+    id: user_button
+    pin:
+      number: GPIO3 # D2
+      inverted: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    name: "User button"
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: led_internal
+    internal: true
+    channel_colors: GRB
+    pin: GPIO1
+    num_leds: 1
+    rmt_symbols: 192
+    chipset: ws2812
+    default_transition_length: 0s
+    effects:
+      - addressable_lambda:
+          name: "Fast Pulse"
+          update_interval: 10ms
+          lambda: |-
+            static float fraction = 0.0;
+            static float step = 0.05;
+            static bool increasing = true;
+
+            auto values = id(led_internal)->current_values;
+            Color color(values.get_red() * 255, values.get_green() * 255, values.get_blue() * 255);
+            it[0].set_rgb(color.red * fraction, 
+                             color.green * fraction, 
+                             color.blue * fraction);
+            
+            fraction += (step * (increasing ? 1 : -1));
+            if (fraction > 1.0) {
+              fraction = 1.0;
+              increasing = !increasing;
+            } else if (fraction < 0.0) {
+              fraction = 0.0;
+              increasing = !increasing;
+            }
+
+      - addressable_lambda:
+          name: "Slow Pulse"
+          update_interval: 30ms
+          lambda: |-
+            static float fraction = 0.0;
+            static float step = 0.05;
+            static bool increasing = true;
+
+            auto values = id(led_internal)->current_values;
+            Color color(values.get_red() * 255, values.get_green() * 255, values.get_blue() * 255);
+            it[0].set_rgb(color.red * fraction, 
+                             color.green * fraction, 
+                             color.blue * fraction);
+            
+            fraction += (step * (increasing ? 1 : -1));
+            if (fraction > 1.0) {
+              fraction = 1.0;
+              increasing = !increasing;
+            } else if (fraction < 0.0) {
+              fraction = 0.0;
+              increasing = !increasing;
+            }
+
+      - addressable_lambda:
+          name: "Factory Reset Coming Up"
+          update_interval: 200ms
+          lambda: |-
+            static bool on = false;
+            on = !on;
+            it[0].set_rgb(on ? 255 : 0, 0, 0);
+  # User facing LED.
+  # Exposed to be used by the user.
+  - platform: partition
+    id: led_respeaker_onboard
+    name: LED Respeaker onboard
+    entity_category: config
+    icon: "mdi:circle-outline"
+    default_transition_length: 0ms
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_off:
+      - script.execute: control_leds
+    initial_state:
+      color_mode: rgb
+      brightness: 100%
+      red: 9.4%
+      green: 73.3%
+      blue: 94.9%
+    segments:
+      - id: led_internal
+        from: 0
+        to: 0
+    effects:
+      - addressable_lambda:
+          name: "Fast Pulse"
+          update_interval: 10ms
+          lambda: |-
+            // Stay quiet while the parent light drives a status effect on the same pixel.
+            if (id(led_internal)->current_values.is_on())
+              return;
+            static float fraction = 0.0;
+            static float step = 0.05;
+            static bool increasing = true;
+
+            auto values = id(led_respeaker_onboard)->current_values;
+            Color color(values.get_red() * 255, values.get_green() * 255, values.get_blue() * 255);
+            it[0].set_rgb(color.red * fraction, 
+                             color.green * fraction, 
+                             color.blue * fraction);
+            
+            fraction += (step * (increasing ? 1 : -1));
+            if (fraction > 1.0) {
+              fraction = 1.0;
+              increasing = !increasing;
+            } else if (fraction < 0.0) {
+              fraction = 0.0;
+              increasing = !increasing;
+            }
+
+      - addressable_lambda:
+          name: "Slow Pulse"
+          update_interval: 30ms
+          lambda: |-
+            // Stay quiet while the parent light drives a status effect on the same pixel.
+            if (id(led_internal)->current_values.is_on())
+              return;
+            static float fraction = 0.0;
+            static float step = 0.05;
+            static bool increasing = true;
+
+            auto values = id(led_respeaker_onboard)->current_values;
+            Color color(values.get_red() * 255, values.get_green() * 255, values.get_blue() * 255);
+            it[0].set_rgb(color.red * fraction, 
+                             color.green * fraction, 
+                             color.blue * fraction);
+            
+            fraction += (step * (increasing ? 1 : -1));
+            if (fraction > 1.0) {
+              fraction = 1.0;
+              increasing = !increasing;
+            } else if (fraction < 0.0) {
+              fraction = 0.0;
+              increasing = !increasing;
+            }
+
+script:
+  # Master script controlling the LEDs, based on different conditions : initialization in progress, wifi and api connected and voice assistant phase.
+  # For the sake of simplicity and re-usability, the script calls child scripts defined below.
+  # This script will be called every time one of these conditions is changing.
+  - id: control_leds
+    mode: restart
+    then:
+      - lambda: |
+          if (id(respeaker).is_failed()) {
+            id(control_leds_respeaker_startup_failed).execute();
+            return;
+          }
+          id(check_if_timers_active).execute();
+          if (id(is_timer_active)){
+            id(fetch_first_active_timer).execute();
+          }
+          if (id(improv_ble_in_progress)) {
+            id(control_leds_improv_ble_state).execute();
+          } else if (id(init_in_progress)) {
+            id(control_leds_init_state).execute();
+          } else if (!id(wifi_id).is_connected() || !id(api_id).is_connected()){
+            id(control_leds_no_ha_connection_state).execute();
+          } else if (id(user_button).state) {
+            id(control_leds_center_button_touched).execute();
+          } else if (id(timer_ringing).state) {
+            id(control_leds_timer_ringing).execute();
+          } else if (id(voice_assistant_phase) == ${voice_assist_waiting_for_command_phase_id}) {
+            id(control_leds_voice_assistant_waiting_for_command_phase).execute();
+          } else if (id(voice_assistant_phase) == ${voice_assist_listening_for_command_phase_id}) {
+            id(control_leds_voice_assistant_listening_for_command_phase).execute();
+          } else if (id(voice_assistant_phase) == ${voice_assist_thinking_phase_id}) {
+            id(control_leds_voice_assistant_thinking_phase).execute();
+          } else if (id(voice_assistant_phase) == ${voice_assist_replying_phase_id}) {
+            id(control_leds_voice_assistant_replying_phase).execute();
+          } else if (id(voice_assistant_phase) == ${voice_assist_error_phase_id}) {
+            id(control_leds_voice_assistant_error_phase).execute();
+          } else if (id(voice_assistant_phase) == ${voice_assist_not_ready_phase_id}) {
+            id(control_leds_voice_assistant_not_ready_phase).execute();
+          } else if (id(is_timer_active)) {
+            id(control_leds_timer_ticking).execute();
+          } else if (id(alarm_on).state && !id(led_respeaker_onboard).remote_values.is_on()) {
+            id(control_leds_alarm_active).execute();
+          } else if (id(voice_assistant_phase) == ${voice_assist_idle_phase_id}) {
+            id(control_leds_voice_assistant_idle_phase).execute();
+          }
+
+  # Script executed if respeaker startup failed
+  # Static red
+  - id: control_leds_respeaker_startup_failed
+    then:
+      - light.turn_on:
+          brightness: 40%
+          red: 100%
+          green: 0%
+          blue: 0%
+          id: led_internal
+          effect: "None"
+
+  # Script executed during Improv BLE
+  # Warm White slow pulse
+  - id: control_leds_improv_ble_state
+    then:
+      - light.turn_on:
+          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          red: 100%
+          green: 89%
+          blue: 71%
+          id: led_internal
+          effect: "Slow Pulse"
+
+  # Script executed during initialization
+  # Fast Blue pulse if Wifi is connected, Else slow blue pulse
+  - id: control_leds_init_state
+    then:
+      - if:
+          condition:
+            wifi.connected:
+          then:
+            - light.turn_on:
+                brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+                red: 9%
+                green: 73%
+                blue: 95%
+                id: led_internal
+                effect: "Fast Pulse"
+          else:
+            - light.turn_on:
+                brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+                red: 9%
+                green: 73%
+                blue: 95%
+                id: led_internal
+                effect: "Slow Pulse"
+  # Script executed when the device has no connection to Home Assistant
+  # Red slow pulse (This will be visible during HA updates for example)
+  - id: control_leds_no_ha_connection_state
+    then:
+      - light.turn_on:
+          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          red: 1
+          green: 0
+          blue: 0
+          id: led_internal
+          effect: "Slow Pulse"
+
+  # Script executed when the voice assistant is idle (waiting for a wake word)
+  # Nothing
+  - id: control_leds_voice_assistant_idle_phase
+    then:
+      - light.turn_off: led_internal
+      - if:
+          condition:
+            light.is_on: led_respeaker_onboard
+          then:
+            light.turn_on: led_respeaker_onboard
+
+  # Script executed when the voice assistant is waiting for a command (After the wake word)
+  # Slow purple pulse
+  - id: control_leds_voice_assistant_waiting_for_command_phase
+    then:
+      - light.turn_on:
+          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          red: 1
+          green: 0.2
+          blue: 1
+          id: led_internal
+          effect: "Slow Pulse"
+
+  # Script executed when the voice assistant is listening to a command
+  # Slow purple pulse
+  - id: control_leds_voice_assistant_listening_for_command_phase
+    then:
+      - light.turn_on:
+          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          red: 1
+          green: 0.2
+          blue: 1
+          id: led_internal
+          effect: "Slow Pulse"
+
+  # Script executed when the voice assistant is thinking to a command
+  # Fast purple pulse
+  - id: control_leds_voice_assistant_thinking_phase
+    then:
+      - light.turn_on:
+          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          red: 1
+          green: 0.2
+          blue: 1
+          id: led_internal
+          effect: "Fast Pulse"
+
+  # Script executed when the voice assistant is replying to a command
+  # Slow cyan pulse
+  - id: control_leds_voice_assistant_replying_phase
+    then:
+      - light.turn_on:
+          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          red: 0.2
+          green: 1
+          blue: 1
+          id: led_internal
+          effect: "Slow Pulse"
+
+  # Script executed when the voice assistant is in error
+  # Fast Red Pulse
+  - id: control_leds_voice_assistant_error_phase
+    then:
+      - light.turn_on:
+          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          red: 1
+          green: 0
+          blue: 0
+          id: led_internal
+          effect: "Fast Pulse"
+
+  # Script executed when the voice assistant is not ready
+  - id: control_leds_voice_assistant_not_ready_phase
+    then:
+      - light.turn_on:
+          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          red: 1
+          green: 0
+          blue: 0
+          id: led_internal
+          effect: "Slow Pulse"
+
+  # Script executed when the center button is touched
+  # The LED turns on blue
+  - id: control_leds_center_button_touched
+    then:
+      - light.turn_on:
+          brightness: !lambda return min ( max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f ) + 0.1f , 1.0f );
+          red: 0
+          green: 0
+          blue: 1
+          id: led_internal
+          effect: "None"
+
+  # Script executed when the timer is ringing, to control the LEDs
+  # The LED blinks green.
+  - id: control_leds_timer_ringing
+    then:
+      - light.turn_on:
+          brightness: !lambda return min ( max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f ) + 0.1f , 1.0f );
+          red: 0
+          green: 1
+          blue: 0
+          id: led_internal
+          effect: "Fast Pulse"
+
+  # Script executed when the timer is ticking, to control the LEDs
+  # Slow dim while pulse.
+  - id: control_leds_timer_ticking
+    then:
+      - light.turn_on:
+          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          red: 0.3
+          green: 0.3
+          blue: 0.3
+          id: led_internal
+          effect: "Slow Pulse"
+  
+  # Script executed when the alarm is active
+  # The LED turns on dim green
+  - id: control_leds_alarm_active
+    then:
+      - light.turn_on:
+          brightness: !lambda return 0.3f;
+          red: 0
+          green: 1
+          blue: 0
+          id: led_internal
+          effect: "None"
+
+  # Hooks for packages/core/controls.yaml
+  - id: control_leds_status_off
+    then:
+      - light.turn_off: led_internal
+  - id: control_leds_factory_reset_coming_up
+    then:
+      - light.turn_on:
+          brightness: 100%
+          id: led_internal
+          effect: "Factory Reset Coming Up"
+  - id: control_leds_factory_reset_confirmed
+    then:
+      - light.turn_on:
+          brightness: 100%
+          red: 100%
+          green: 0%
+          blue: 0%
+          id: led_internal
+          effect: "none"
+
+respeaker_lite:
+  firmware:
+    on_begin:
+      - light.turn_on:
+          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          red: 50%
+          green: 50%
+          blue: 50%
+          id: led_internal
+          effect: "Slow Pulse"
+    on_end:
+      - light.turn_on:
+          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          red: 0%
+          green: 100%
+          blue: 0%
+          id: led_internal
+          effect: "Fast Pulse"
+      - delay: 3s
+      - light.turn_off:
+          id: led_internal
+    on_error:
+      - light.turn_on:
+          brightness: !lambda return max( id(led_respeaker_onboard).current_values.get_brightness() , 0.2f );
+          red: 100%
+          green: 0%
+          blue: 0%
+          id: led_internal
+          effect: "Fast Pulse"
+      - delay: 3s
+      # The component is failed now, so control_leds keeps the failure state on
+      - script.execute: control_leds

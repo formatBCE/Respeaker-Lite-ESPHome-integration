@@ -49,6 +49,44 @@ To update the device:
 
 Use `main` only to test new code. A change in `main` can break the build or the device. To get the newest code before a release, set `respeaker_lite_ref` to `main`.
 
+## Change the configuration
+The firmware is a set of packages in the [packages](/packages) directory:
+
+| Package | Content |
+| --- | --- |
+| `core/base.yaml` | Boot, network, API, and diagnostic entities |
+| `core/voice-assistant.yaml` | Wake word, voice pipeline, sounds, and Home Assistant events |
+| `core/media-player.yaml` | Media player, Sendspin, and audio ducking |
+| `core/timers-alarm.yaml` | Timers, daily alarm, and time zone |
+| `core/controls.yaml` | User button actions and the Button press event |
+| `respeaker-lite/hardware.yaml` | ReSpeaker Lite board: audio, XMOS, and firmware update |
+| `lite/device.yaml` | XIAO ESP32-S3: user button pin and the RGB LED |
+
+The example configuration includes all packages through `config/common/respeaker-satellite-base.yaml`. You can change the result in your own configuration. You do not need to copy the files.
+
+**Change a value.** Set a substitution with the same name. Your value overrides the value in the package. For example, use your own wake sound:
+
+```yaml
+substitutions:
+  wake_word_triggered_sound_file: https://example.com/my-wake-sound.flac
+```
+
+**Add steps to a script.** Use `!extend`. The new steps run after the existing steps:
+
+```yaml
+script:
+  - id: !extend control_leds
+    then:
+      - logger.log: "LED state changed"
+```
+
+**Remove an entity.** Use `!remove`:
+
+```yaml
+button:
+  - id: !remove restart_button
+```
+
 ## DFU software auto-update
 Since version 2025.2.2, the firmware includes corresponding DFU firmware for Respeaker Lite board. On first start after update, new firmware will be installed to Respeaker automatically. You will see Respeaker LED flashing yellow, while installing, and green on successful install. So now there's no need to update DFU firmware. Woohoo!
 

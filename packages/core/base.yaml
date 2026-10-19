@@ -1,0 +1,117 @@
+# =============================================================================
+# Voice satellite core — base package
+#
+# Boot and connection logic, the voice assistant phase constants, and the
+# diagnostic entities. This package does not depend on the board.
+#
+# The core packages expect the device packages to supply these IDs:
+#   microphone  i2s_mics                         (stereo: channel 0 for STT, channel 1 for wake word)
+#   speaker     announcement_resampling_speaker, media_resampling_speaker,
+#               media_mixing_input               (the mixer input that ducks)
+#   switch      mic_mute_switch
+#   script      control_leds                     (the LED dispatcher)
+# controls.yaml expects more IDs. Its header lists them.
+# =============================================================================
+
+substitutions:
+  # Phases of the Voice Assistant
+  # The voice assistant is ready to be triggered by a wake word
+  voice_assist_idle_phase_id: '1'
+  # The voice assistant is waiting for a voice command (after being triggered by the wake word)
+  voice_assist_waiting_for_command_phase_id: '2'
+  # The voice assistant is listening for a voice command
+  voice_assist_listening_for_command_phase_id: '3'
+  # The voice assistant is currently processing the command
+  voice_assist_thinking_phase_id: '4'
+  # The voice assistant is replying to the command
+  voice_assist_replying_phase_id: '5'
+  # The voice assistant is not ready
+  voice_assist_not_ready_phase_id: '10'
+  # The voice assistant encountered an error
+  voice_assist_error_phase_id: '11'
+  # Change this to true in case you ahve a hidden SSID at home.
+  hidden_ssid: "false"
+  # Ref of the repository that holds the core packages. The core lives in
+  # Respeaker-Lite-ESPHome-integration today, so it follows respeaker_lite_ref.
+  satellite_core_ref: ${respeaker_lite_ref}
+
+esphome:
+  min_version: 2026.9.0
+  on_boot:
+    - priority: 375
+      then:
+        # Run the script to refresh the LED status
+        - script.execute: control_leds
+        # If after 10 minutes, the device is still initializing (It did not yet connect to Home Assistant), turn off the init_in_progress variable and run the script to refresh the LED status
+        - delay: 10min
+        - if:
+            condition:
+              lambda: return id(init_in_progress);
+            then:
+              - lambda: id(init_in_progress) = false;
+              - script.execute: control_leds
+
+wifi:
+  id: wifi_id
+  fast_connect: ${hidden_ssid}
+  on_connect:
+    - lambda: id(improv_ble_in_progress) = false;
+    - script.execute: control_leds
+  on_disconnect:
+    - script.execute: control_leds
+
+network:
+  enable_ipv6: true
+
+logger:
+  level: debug
+  initial_level: debug
+  logs:
+    sensor: WARN  # avoids logging debug sensor updates
+#  hardware_uart: uart0  #Uncomment to see serial logs via USB connection. Comment out after debufgging - this line introduces noise on speaker...
+
+api:
+  id: api_id
+  on_client_connected:
+    - script.execute: control_leds
+  on_client_disconnected:
+    - script.execute: control_leds
+  encryption:
+
+globals:
+  - id: init_in_progress
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+  # Global variable storing the state of ImprovBLE. Used to draw different LED animations
+  - id: improv_ble_in_progress
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  # Global variable tracking the phase of the voice assistant (defined above). Initialized to not_ready
+  - id: voice_assistant_phase
+    type: int
+    restore_value: no
+    initial_value: ${voice_assist_not_ready_phase_id}
+
+select:
+  - platform: logger
+    id: logger_select
+    name: Logger Level
+    disabled_by_default: true
+
+button:
+  - platform: factory_reset
+    id: factory_reset_button
+    name: "Factory Reset"
+    entity_category: diagnostic
+    internal: true
+  - platform: restart
+    id: restart_button
+    name: "Restart"
+    entity_category: config
+    disabled_by_default: true
+    icon: "mdi:restart"
+
+debug:
+  update_interval: 5s

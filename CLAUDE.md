@@ -28,8 +28,16 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
 
 ## Layout
 
-- `config/common/respeaker-satellite-base.yaml` — the whole device definition, about 1650 lines. Almost every change
-  belongs here.
+- `packages/` — the device definition, split into packages. Three layers, included in this order:
+  - `core/` — the board-independent voice satellite: `base.yaml` (boot, network, API, phase globals), `voice-assistant.yaml`
+    (wake word, pipeline, sounds, HA events), `media-player.yaml`, `timers-alarm.yaml`, and `controls.yaml` (the Voice PE
+    button behavior). The core is meant to move to its own repository later, so it must not reference IDs of a board.
+    The header of `core/base.yaml` lists the IDs that a device must supply; `controls.yaml` lists its own.
+  - `respeaker-lite/hardware.yaml` — the ReSpeaker Lite board: ESP32-S3, I2C, I2S, mics, speaker chain, AIC3204, XMOS
+    (`respeaker_lite` component, mute, DFU), external components. Koala uses this package too.
+  - `lite/device.yaml` — the XIAO device: flash size, user button pin, the single LED and every `control_leds*` script,
+    the DFU LED automations, and `esphome.project`.
+- `config/common/respeaker-satellite-base.yaml` — includes all packages. Existing user configs import this path, so keep it.
 - `config/respeaker-satellite-dashboard-example.yaml` — the thin user config. It sets `respeaker_lite_ref` and imports
   the base package from `github://formatBCE/Respeaker-Lite-ESPHome-integration/...@${respeaker_lite_ref}`.
 - `esphome/components/respeaker_lite/` — the custom ESPHome external component (Python codegen plus C++).
@@ -40,10 +48,16 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
 
 ## Important: the source of truth is GitHub, not the working tree
 
-`external_components` in the base YAML pulls `respeaker_lite` from this repository at `ref: ${respeaker_lite_ref}`, and
-it pulls a patched `i2s_audio` from `formatBCE/esphome` at `ref: ${i2s_audio_ref}` (the `respeaker_microphone` branch).
-The base YAML also references the wake word model and the XMOS firmware by raw GitHub URL at `${respeaker_lite_ref}`.
-The default of `respeaker_lite_ref` is the current release tag, not `main`.
+`external_components` in `packages/respeaker-lite/hardware.yaml` pulls `respeaker_lite` from this repository at
+`ref: ${respeaker_lite_ref}`, and it pulls a patched `i2s_audio` from `formatBCE/esphome` at `ref: ${i2s_audio_ref}`
+(the `respeaker_microphone` branch). The XMOS firmware URL uses `${respeaker_lite_ref}`. The wake word model URL in the
+core uses `${satellite_core_ref}`, which follows `respeaker_lite_ref`. The default of `respeaker_lite_ref` is the current
+release tag, not `main`.
+
+To test package edits, include the local `config/common/respeaker-satellite-base.yaml` from a config outside the
+repository. Relative includes resolve the same way locally and from the git cache.
+
+To verify a refactor, run `esphome config` before and after, and diff the merged output. The output must not change.
 
 So a local edit to `esphome/components/respeaker_lite/` has no effect on a build. To test a component change, point the
 source at a local path first:
@@ -93,7 +107,10 @@ assistant phase. Each branch calls a dedicated `control_leds_*` child script.
 
 Never write to a light directly from an automation. Set the state that `control_leds` reads, then call
 `script.execute: control_leds`. The voice assistant phase lives in the `voice_assistant_phase` global, and the phase
-numbers come from the `substitutions:` block at the top of the base YAML.
+numbers come from the `substitutions:` block of `packages/core/base.yaml`.
+
+`packages/core/controls.yaml` does not touch a light. It calls three hook scripts that the device supplies:
+`control_leds_status_off`, `control_leds_factory_reset_coming_up`, and `control_leds_factory_reset_confirmed`.
 
 ### Audio pipeline
 
@@ -122,9 +139,13 @@ again with `setenv("TZ", ...)`.
 
 - `esphome.min_version` tracks the ESPHome release that the firmware needs, for example `2026.9.0`.
 - Releases use plain CalVer tags without a `v`, for example `2026.9.1`. To prepare a release, set the new version in
-  three places: `esphome.project.version` and the `respeaker_lite_ref` default in the base YAML, and
-  `respeaker_lite_ref` in the example config. Then tag that commit with the same version. The default must equal the
+  three places: `esphome.project.version` in `packages/lite/device.yaml`, the `respeaker_lite_ref` default in
+  `packages/respeaker-lite/hardware.yaml`, and `respeaker_lite_ref` in the example config. Then tag that commit with the
+  same version. The default must equal the
   tag, because a pinned package then gets the component, the model, and the firmware from the same release.
 - Blueprint files and model files are referenced by absolute raw GitHub URL. A rename breaks live installations.
 - New scripts that can overlap use `mode: restart`. See commit 3136cf7.
 - The `disable_buttons` switch guards every button automation. Add the same guard to a new button action.
+- Package order matters. A later package overrides a scalar of an earlier one, and lists join in package order.
+- A package extends an item of another package with `id: !extend <id>`. ESPHome resolves it after it merges all
+  packages, so the order of the two packages does not matter.
