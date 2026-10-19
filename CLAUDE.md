@@ -30,8 +30,8 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
 
 - `config/common/respeaker-satellite-base.yaml` — the whole device definition, about 1650 lines. Almost every change
   belongs here.
-- `config/respeaker-satellite-dashboard-example.yaml` — the thin user config. It imports the base package from
-  `github://formatBCE/Respeaker-Lite-ESPHome-integration/...@main`.
+- `config/respeaker-satellite-dashboard-example.yaml` — the thin user config. It sets `respeaker_lite_ref` and imports
+  the base package from `github://formatBCE/Respeaker-Lite-ESPHome-integration/...@${respeaker_lite_ref}`.
 - `esphome/components/respeaker_lite/` — the custom ESPHome external component (Python codegen plus C++).
 - `microwakeword/models/v2/` — the `kenobi` wake word model, served over raw GitHub URL.
 - `respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin` — the XMOS firmware that the device flashes to itself.
@@ -40,9 +40,10 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
 
 ## Important: the source of truth is GitHub, not the working tree
 
-`external_components` in the base YAML pulls `respeaker_lite` from this repository at `ref: main`, and it pulls a patched
-`i2s_audio` from the `respeaker_microphone` branch of `formatBCE/esphome`. The base YAML also references the wake word
-model and the XMOS firmware by raw GitHub URL.
+`external_components` in the base YAML pulls `respeaker_lite` from this repository at `ref: ${respeaker_lite_ref}`, and
+it pulls a patched `i2s_audio` from `formatBCE/esphome` at `ref: ${i2s_audio_ref}` (the `respeaker_microphone` branch).
+The base YAML also references the wake word model and the XMOS firmware by raw GitHub URL at `${respeaker_lite_ref}`.
+The default of `respeaker_lite_ref` is the current release tag, not `main`.
 
 So a local edit to `esphome/components/respeaker_lite/` has no effect on a build. To test a component change, point the
 source at a local path first:
@@ -119,8 +120,11 @@ again with `setenv("TZ", ...)`.
 
 ## Conventions
 
-- Version bumps change `esphome.project.version` and `esphome.min_version` in the base YAML together. Both track the
-  ESPHome release, for example `2026.6.0`.
+- `esphome.min_version` tracks the ESPHome release that the firmware needs, for example `2026.9.0`.
+- Releases use plain CalVer tags without a `v`, for example `2026.9.1`. To prepare a release, set the new version in
+  three places: `esphome.project.version` and the `respeaker_lite_ref` default in the base YAML, and
+  `respeaker_lite_ref` in the example config. Then tag that commit with the same version. The default must equal the
+  tag, because a pinned package then gets the component, the model, and the firmware from the same release.
 - Blueprint files and model files are referenced by absolute raw GitHub URL. A rename breaks live installations.
 - New scripts that can overlap use `mode: restart`. See commit 3136cf7.
 - The `disable_buttons` switch guards every button automation. Add the same guard to a new button action.

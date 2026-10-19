@@ -16,6 +16,13 @@ substitutions:
   voice_assist_error_phase_id: '11'
   # Change this to true in case you ahve a hidden SSID at home.
   hidden_ssid: "false"
+  # Release of this repository: a tag such as 2026.9.1, a branch, or a commit.
+  # It selects the respeaker_lite component, the wake word model, and the XMOS
+  # firmware. Each release sets it to its own tag, so a pinned package stays
+  # consistent. Set it to "main" to follow the newest code.
+  respeaker_lite_ref: 2026.9.1
+  # Ref of the patched i2s_audio fork. The stock component does not work.
+  i2s_audio_ref: respeaker_microphone
   # Substitutions for audio files
   mute_switch_on_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/mute_switch_on.flac
   mute_switch_off_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/mute_switch_off.flac
@@ -34,7 +41,7 @@ substitutions:
 esphome:
   project: 
     name: formatbce.Respeaker Lite Satellite
-    version: 2026.9.0
+    version: 2026.9.1
   min_version: 2026.9.0
   on_boot:
     - priority: 375
@@ -1319,7 +1326,7 @@ respeaker_lite:
     internal: false
     id: firmware_version
   firmware:
-    url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/raw/refs/heads/main/respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin
+    url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/raw/${respeaker_lite_ref}/respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin
     version: "1.1.0"
     md5: 9297155d1bf3eb21a9d4db52a89ea0c6
     on_begin:
@@ -1357,14 +1364,14 @@ external_components:
   - source:
       type: git
       url: https://github.com/formatBCE/esphome
-      ref: respeaker_microphone
+      ref: ${i2s_audio_ref}
     components:
       - i2s_audio
     refresh: 0s
   - source:
       type: git
       url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration
-      ref: main
+      ref: ${respeaker_lite_ref}
     components: 
       - respeaker_lite
     refresh: 0s
@@ -1385,7 +1392,7 @@ micro_wake_word:
     - model: https://github.com/OHF-Voice/micro-wake-word/releases/download/okay_nabu_20241226.3/okay_nabu.json
       # probability_cutoff: 0.8
       id: okay_nabu
-    - model: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/refs/heads/main/microwakeword/models/v2/kenobi.json
+    - model: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${respeaker_lite_ref}/microwakeword/models/v2/kenobi.json
       id: kenobi
     - model: hey_jarvis
       id: hey_jarvis

@@ -24,7 +24,7 @@ __* Thanks to Mike aka @mikey60 and his fork to nabu_microphone, this project is
 4. Flash the ESPHome firmware to the ESP32. Use the ESP32 USB port.
    - Copy [the example configuration](/config/respeaker-satellite-dashboard-example.yaml) into ESPHome, and change it for your device.
    - You do not need to download other files. The example gets the base configuration from this GitHub repository.
-   - ESPHome checks the repository for changes one time each day.
+   - The example uses one release of this repository. The device does not change until you select a newer release. Read [Releases and updates](#releases-and-updates).
 5. Add device to Home Assistant.
 
 ### Here are also some [useful blueprints to use with your satellite](readme/blueprints.md)
@@ -37,6 +37,17 @@ There are some additional things i've added for convenience:
 - TTS URI event `esphome.tts_uri`, sent to Home Assistant every time there's voice response (check out example automation to redirect response to other media player [here](readme/tts_uri.md));
 - STT text event `esphome.stt_text`, sent every time there's text of response available (you may use it to display readable response on your dashboard, for example);
 - daily alarm functionality, read more on it [here](readme/alarms.md).
+
+## Releases and updates
+Each release has a tag, for example `2026.9.1`. The [tags page](https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/tags) shows all releases.
+
+The `respeaker_lite_ref` substitution in your configuration selects the release. One value controls the base configuration, the `respeaker_lite` component, the wake word model, and the XMOS firmware.
+
+To update the device:
+1. Set `respeaker_lite_ref` to the tag of the new release.
+2. Install the configuration on the device again.
+
+Use `main` only to test new code. A change in `main` can break the build or the device. To get the newest code before a release, set `respeaker_lite_ref` to `main`.
 
 ## DFU software auto-update
 Since version 2025.2.2, the firmware includes corresponding DFU firmware for Respeaker Lite board. On first start after update, new firmware will be installed to Respeaker automatically. You will see Respeaker LED flashing yellow, while installing, and green on successful install. So now there's no need to update DFU firmware. Woohoo!
