@@ -748,6 +748,10 @@ script:
     mode: restart
     then:
       - lambda: |
+          if (id(respeaker).is_failed()) {
+            id(control_leds_respeaker_startup_failed).execute();
+            return;
+          }
           id(check_if_timers_active).execute();
           if (id(is_timer_active)){
             id(fetch_first_active_timer).execute();
@@ -781,6 +785,18 @@ script:
           } else if (id(voice_assistant_phase) == ${voice_assist_idle_phase_id}) {
             id(control_leds_voice_assistant_idle_phase).execute();
           }
+
+  # Script executed if respeaker startup failed
+  # Static red
+  - id: control_leds_respeaker_startup_failed
+    then:
+      - light.turn_on:
+          brightness: 40%
+          red: 100%
+          green: 0%
+          blue: 0%
+          id: led_internal
+          effect: "None"
 
   # Script executed during Improv BLE
   # Warm White slow pulse
@@ -1053,6 +1069,7 @@ script:
           condition:
             media_player.is_announcing:
               id: external_media_player
+          timeout: 5s
       - delay: 1s
       # Enable stop wake word
       - if:
@@ -1333,8 +1350,8 @@ respeaker_lite:
           id: led_internal
           effect: "Fast Pulse"
       - delay: 3s
-      - light.turn_off:
-          id: led_internal
+      # The component is failed now, so control_leds keeps the failure state on
+      - script.execute: control_leds
 
 external_components:
   - source:
@@ -1598,8 +1615,15 @@ voice_assistant:
   on_timer_cancelled:
     - script.execute: control_leds
     - lambda: |
-        id(next_timer).publish_state(id(first_active_timer).seconds_left);
-        id(next_timer_name).publish_state(id(first_active_timer).name);
+        id(check_if_timers_active).execute();
+        if (id(is_timer_active)) {
+          id(fetch_first_active_timer).execute();
+          id(next_timer).publish_state(id(first_active_timer).seconds_left);
+          id(next_timer_name).publish_state(id(first_active_timer).name);
+        } else {
+          id(next_timer).publish_state(-1);
+          id(next_timer_name).publish_state("-");
+        }
   on_timer_updated:
     - script.execute: control_leds
     - lambda: |

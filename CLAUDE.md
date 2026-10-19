@@ -85,7 +85,8 @@ They set `USE_RESPEAKER_LITE_STATE_CALLBACK`.
 
 ### LED state machine
 
-All LED output goes through the `control_leds` script. That script is a priority chain: ImprovBLE, then initialization,
+All LED output goes through the `control_leds` script. That script is a priority chain: a failed `respeaker_lite`
+component, then ImprovBLE, then initialization,
 then loss of the Wi-Fi or the API connection, then the button touch, then the timer or the alarm state, then the voice
 assistant phase. Each branch calls a dedicated `control_leds_*` child script.
 
