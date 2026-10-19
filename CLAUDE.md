@@ -8,7 +8,7 @@ This repository holds an ESPHome firmware definition for the Seeed ReSpeaker Lit
 XU316 audio front end). It is not an application with a build system. It is a YAML package plus one custom ESPHome
 component. Home Assistant users consume it as a remote package.
 
-There is no test suite, no linter configuration, and no CI workflow. `.github/` holds only `FUNDING.yml`.
+There is no test suite and no linter configuration. The only CI workflow is `.github/workflows/release.yaml`, which tags releases.
 
 ## Commands
 
@@ -140,9 +140,11 @@ again with `setenv("TZ", ...)`.
 - `esphome.min_version` tracks the ESPHome release that the firmware needs, for example `2026.9.0`.
 - Releases use plain CalVer tags without a `v`, for example `2026.9.1`. To prepare a release, set the new version in
   three places: `esphome.project.version` in `packages/lite/device.yaml`, the `respeaker_lite_ref` default in
-  `packages/respeaker-lite/hardware.yaml`, and `respeaker_lite_ref` in the example config. Then tag that commit with the
-  same version. The default must equal the
+  `packages/respeaker-lite/hardware.yaml`, and `respeaker_lite_ref` in the example config. The default must equal the
   tag, because a pinned package then gets the component, the model, and the firmware from the same release.
+- Push that commit to `main`. `.github/workflows/release.yaml` sees the new version in `packages/lite/device.yaml`,
+  checks the two refs and the configuration at the commit, and creates the tag and a GitHub release. A push without a
+  new version does nothing. Do not tag by hand.
 - Blueprint files and model files are referenced by absolute raw GitHub URL. A rename breaks live installations.
 - New scripts that can overlap use `mode: restart`. See commit 3136cf7.
 - The `disable_buttons` switch guards every button automation. Add the same guard to a new button action.

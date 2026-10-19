@@ -1,0 +1,90 @@
+name: Release
+
+# A push to main that changes esphome.project.version in packages/lite/device.yaml
+# tags that version and creates a GitHub release. A push without a new version
+# does nothing. Run it by hand to add release notes text.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - packages/lite/device.yaml
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: "Text above the generated release notes (optional)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  # ESPHome for the configuration check. Raise it on purpose.
+  ESPHOME_VERSION: "2026.9.1"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the version and look for its tag
+        id: version
+        run: |
+          value() { grep -E "^[[:space:]]*$1:" "$2" | head -n1 | sed -E "s/.*$1:[[:space:]]*\"?([^\"]+)\"?[[:space:]]*\$/\\1/"; }
+          V=$(value version packages/lite/device.yaml)
+          test -n "$V" || { echo "::error::No esphome.project.version in packages/lite/device.yaml"; exit 1; }
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/$V" > /dev/null; then
+            if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+              echo "::error::Tag $V exists. Bump esphome.project.version in packages/lite/device.yaml first."
+              exit 1
+            fi
+            echo "Tag $V exists. Nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          for f in packages/respeaker-lite/hardware.yaml config/respeaker-satellite-dashboard-example.yaml; do
+            REF=$(value respeaker_lite_ref "$f")
+            if [ "$REF" != "$V" ]; then
+              echo "::error::respeaker_lite_ref in $f is '$REF'. Set it to $V."
+              exit 1
+            fi
+          done
+          echo "New version $V. Releasing."
+
+      - uses: actions/setup-python@v5
+        if: steps.version.outputs.release == 'true'
+        with:
+          python-version: "3.12"
+
+      - name: Check the configuration at this commit
+        if: steps.version.outputs.release == 'true'
+        # The tag does not exist yet, so the check uses the commit SHA as the ref.
+        # It resolves the component, the wake word model, and the XMOS firmware.
+        run: |
+          pip install "esphome==$ESPHOME_VERSION"
+          cat > "$RUNNER_TEMP/release-check.yaml" <<EOF
+          substitutions:
+            respeaker_lite_ref: $GITHUB_SHA
+          packages:
+            base: !include $GITHUB_WORKSPACE/config/common/respeaker-satellite-base.yaml
+          esphome:
+            name: release-check
+          wifi:
+            ssid: "ci"
+            password: "ci-password"
+          EOF
+          esphome config "$RUNNER_TEMP/release-check.yaml" > /dev/null
+
+      - name: Create the tag and the GitHub release
+        if: steps.version.outputs.release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ steps.version.outputs.version }}
+          body: ${{ inputs.notes }}
+          generate_release_notes: true
