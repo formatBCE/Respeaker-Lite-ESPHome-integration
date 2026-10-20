@@ -1,8 +1,8 @@
 # =============================================================================
 # Voice satellite core — timers and alarm package
 #
-# Timers from the voice pipeline, the daily alarm, the time zone, and the
-# clock entities.
+# Timers from the voice pipeline, the daily alarm, the snooze, the time zone,
+# and the clock entities.
 # =============================================================================
 
 esphome:
@@ -51,6 +51,12 @@ globals:
   - id: is_timer_active
     type: bool
     restore_value: no
+  # Time (epoch) at which a snoozed ring starts again, 0 = no snooze. Restored,
+  # so a reboot during the snooze does not lose the alarm.
+  - id: snooze_until
+    type: time_t
+    restore_value: yes
+    initial_value: '0'
 
 time:
   - platform: homeassistant
@@ -76,6 +82,8 @@ datetime:
     internal: false
     set_action:
       then:
+        # A new alarm time abandons the snooze of the old one.
+        - lambda: id(snooze_until) = 0;
         - switch.turn_on: alarm_on
           
 
@@ -87,8 +95,10 @@ switch:
     internal: true
     restore_mode: ALWAYS_OFF
     on_turn_off:
-      # Disable stop wake word
+      - script.stop: ring_timeout
+      # Disable stop and snooze wake words
       - micro_wake_word.disable_model: stop
+      - micro_wake_word.disable_model: snooze
       - script.execute: disable_repeat
       # Stop any current announcement (ie: stop the timer ring mid playback)
       - if:
@@ -112,15 +122,20 @@ switch:
           id: media_mixing_input
           decibel_reduction: 20
           duration: 0.0s
-      # Enable stop wake word
+      # Enable stop wake word, and snooze wake word if snooze is on
       - micro_wake_word.enable_model: stop
+      - if:
+          condition:
+            switch.is_on: snooze_enabled
+          then:
+            - micro_wake_word.enable_model: snooze
       # Ring timer
       - script.execute: ring_timer
       # Refresh LED
       - script.execute: control_leds
-      # If 15 minutes have passed and the timer is still ringing, stop it.
-      - delay: 15min
-      - switch.turn_off: timer_ringing
+      # Stop the ring after 15 minutes. A script, not a delay here: a delay
+      # would survive turn-off and cut a later ring short.
+      - script.execute: ring_timeout
   # Defines if alarm is active
   - platform: template
     optimistic: true
@@ -132,6 +147,70 @@ switch:
       - script.execute: control_leds
     on_turn_off:
       - script.execute: control_leds
+  # Lets "Snooze" stop a ring and start it again after "Snooze duration".
+  - platform: template
+    id: snooze_enabled
+    name: "Snooze enabled"
+    icon: mdi:alarm-snooze
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    on_turn_off:
+      - lambda: id(snooze_until) = 0;
+
+number:
+  # Nine minutes, as bedside clocks have done since the 1950s.
+  - platform: template
+    id: snooze_minutes
+    name: "Snooze duration"
+    icon: mdi:alarm-snooze
+    optimistic: true
+    restore_value: true
+    initial_value: 9
+    min_value: 1
+    max_value: 60
+    step: 1
+    unit_of_measurement: min
+    mode: box
+
+binary_sensor:
+  - platform: template
+    id: snooze_pending
+    name: "Snooze pending"
+    icon: mdi:alarm-snooze
+    lambda: return id(snooze_until) != 0;
+
+button:
+  # "Stop" is not listened for during a snooze, so a false "Stop" cannot cancel
+  # a wake-up. Cancel a snooze from Home Assistant instead.
+  - platform: template
+    id: snooze_cancel
+    name: "Cancel snooze"
+    icon: mdi:alarm-off
+    on_press:
+      - lambda: id(snooze_until) = 0;
+
+interval:
+  # Starts the snoozed ring again. A snooze older than the 15 minute ring limit
+  # (the device was off) is dropped instead of ringing late. Turning "Alarm on"
+  # off cancels the snooze: this check watches the switch, because a device
+  # package can replace the triggers of alarm_on (Koala does).
+  - interval: 1s
+    then:
+      - lambda: |-
+          static bool was_on = id(alarm_on).state;
+          bool is_on = id(alarm_on).state;
+          if (was_on && !is_on) id(snooze_until) = 0;
+          was_on = is_on;
+          if (id(snooze_until) == 0) return;
+          auto now = id(homeassistant_time).now();
+          if (!now.is_valid() || now.timestamp < id(snooze_until)) return;
+          bool stale = now.timestamp - id(snooze_until) > 15 * 60;
+          id(snooze_until) = 0;
+          if (stale) {
+            ESP_LOGW("snooze", "Snooze expired while the device was off");
+            return;
+          }
+          id(timer_ringing).turn_on();
 
 sensor:
   - platform: template
@@ -207,6 +286,31 @@ voice_assistant:
         }
 
 script:
+  # Stops a ring after 15 minutes. timer_ringing's on_turn_off stops this script.
+  - id: ring_timeout
+    mode: restart
+    then:
+      - delay: 15min
+      - switch.turn_off: timer_ringing
+
+  # "Snooze" while ringing: stop the ring, and ring again after snooze_minutes.
+  # Needs the clock, because the deadline is a time. Without the clock the ring
+  # continues, so a snooze never loses an alarm.
+  - id: snooze_ring
+    then:
+      - if:
+          condition:
+            lambda: return id(homeassistant_time).now().is_valid();
+          then:
+            - lambda: |-
+                id(snooze_until) = id(homeassistant_time).now().timestamp +
+                                   (time_t) id(snooze_minutes).state * 60;
+            - switch.turn_off: timer_ringing
+          else:
+            - logger.log:
+                level: WARN
+                format: "Snooze ignored: the device clock is not set"
+
   # Script executed when the timer is ringing, to playback sounds.
   - id: ring_timer
     then:

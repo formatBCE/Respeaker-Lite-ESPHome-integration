@@ -28,3 +28,22 @@ Now to the action. Find drop-down `Alarm action` and adjust it to your preferenc
 - `Sound and event` - both local sound playback and event sending will be executed.
 
 That's it! Enjoy your new alarm!
+
+### Snooze
+
+When a timer or the alarm rings, say "Snooze". You do not say the wake word
+first. The ring stops, and starts again after the **Snooze duration** (9 minutes
+by default). You can snooze again each time the ring starts again. To stop the
+ring, say "Stop" or the wake word.
+
+The device does not listen for "Stop" while it waits to ring again, so a false
+"Stop" cannot cancel your alarm. To cancel a snooze, press **Cancel snooze**, or
+turn off **Alarm on**. The **Snooze pending** sensor shows that a ring waits to
+start again. To disable snooze, turn off **Snooze enabled**.
+
+The device keeps the snooze if it restarts. If the device was off for more than
+15 minutes after the ring was due, the device does not ring.
+
+Snooze needs the clock of the device. If the clock is not set, the device
+ignores "Snooze" and continues to ring. The "Snooze" model knows English only.
+[dlarkinsPonderosa](https://github.com/dlarkinsPonderosa) trained the model.
