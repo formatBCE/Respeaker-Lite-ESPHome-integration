@@ -42,6 +42,10 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
   the base package from `github://formatBCE/Respeaker-Lite-ESPHome-integration/...@${respeaker_lite_ref}`.
 - `esphome/components/respeaker_lite/` — the custom ESPHome external component (Python codegen plus C++).
 - `microwakeword/models/v2/` — the `kenobi` wake word model, served over raw GitHub URL.
+- `sounds/` — the twelve built-in sounds: Ogg Opus copies (48 kbps mono) of the Voice PE sounds, CC BY 4.0
+  (`sounds/LICENSE.md` holds the attribution and the ffmpeg command). `core/voice-assistant.yaml` gets them at
+  `${satellite_core_ref}`. Keep them Opus: both media player pipelines are `format: FLAC`, so no MP3 file means no MP3
+  decoder in the build. A new MP3 or WAV sound adds that decoder back. Koala gets the sounds from this core.
 - `respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin` — the XMOS firmware that the device flashes to itself.
 - `blueprints/automation/formatbce/` — Home Assistant automation blueprints, imported by raw GitHub URL.
 - `readme/`, `casing/` — user documentation and 3D print files.
@@ -50,8 +54,8 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
 
 `external_components` in `packages/respeaker-lite/hardware.yaml` pulls `respeaker_lite` from this repository at
 `ref: ${respeaker_lite_ref}`, and it pulls a patched `i2s_audio` from `formatBCE/esphome` at `ref: ${i2s_audio_ref}`
-(the `respeaker_microphone` branch). The XMOS firmware URL uses `${respeaker_lite_ref}`. The wake word model URL in the
-core uses `${satellite_core_ref}`, which follows `respeaker_lite_ref`. The default of `respeaker_lite_ref` is the current
+(the `respeaker_microphone` branch). The XMOS firmware URL uses `${respeaker_lite_ref}`. The wake word model and sound URLs in
+the core use `${satellite_core_ref}`, which follows `respeaker_lite_ref`. The default of `respeaker_lite_ref` is the current
 release tag, not `main`.
 
 To test package edits, include the local `config/common/respeaker-satellite-base.yaml` from a config outside the
