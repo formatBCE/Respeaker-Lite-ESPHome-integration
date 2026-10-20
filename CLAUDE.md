@@ -95,6 +95,10 @@ and emits the bytes as a PROGMEM array. To change the firmware you must update t
 together in the `respeaker_lite:` block. A wrong MD5 fails validation, and a wrong `version` string causes a reflash on
 every boot.
 
+The update starts only if the found version is at least `auto_update_min_version` (default `1.0.8`). Below that, the
+component marks itself failed and does not flash, because the DFU of older XMOS firmware can erase its own factory
+image (issue 94).
+
 The `on_begin`, `on_end`, `on_error`, and `on_progress` automations only compile when at least one of them is present.
 They set `USE_RESPEAKER_LITE_STATE_CALLBACK`.
 

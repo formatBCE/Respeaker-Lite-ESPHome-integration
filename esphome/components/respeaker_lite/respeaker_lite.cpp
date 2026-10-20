@@ -27,13 +27,20 @@ void RespeakerLite::setup() {
     if (!this->dfu_get_version_()) {
       ESP_LOGE(TAG, "Communication with Respeaker Lite failed");
       this->mark_failed();
-    } else if (!this->versions_match_() && this->firmware_bin_is_valid_()) {
+    } else if (this->versions_match_() || !this->firmware_bin_is_valid_()) {
+      initialized = true;
+    } else if (!this->version_safe_to_update_()) {
+      ESP_LOGE(TAG,
+               "XMOS version %u.%u.%u is too old to update safely, its DFU can erase the factory image. "
+               "Flash %u.%u.%u over USB.",
+               this->firmware_version_major_, this->firmware_version_minor_, this->firmware_version_patch_,
+               this->firmware_bin_version_major_, this->firmware_bin_version_minor_, this->firmware_bin_version_patch_);
+      this->mark_failed(LOG_STR("XMOS firmware too old to update safely"));
+    } else {
       ESP_LOGW(TAG, "Expected XMOS version: %u.%u.%u; found: %u.%u.%u. Updating...", this->firmware_bin_version_major_,
                this->firmware_bin_version_minor_, this->firmware_bin_version_patch_, this->firmware_version_major_,
                this->firmware_version_minor_, this->firmware_version_patch_);
       this->start_dfu_update();
-    } else {
-      initialized = true;
     }
   });
 }
@@ -124,8 +131,14 @@ RespeakerLiteUpdaterStatus RespeakerLite::dfu_update_send_block_() {
                                           0, 0};        // additional payload length (set below)
                                                         // followed by payload data with null terminator
   if (millis() > this->last_ready_ + DFU_TIMEOUT_MS) {
-    ESP_LOGE(TAG, "DFU timed out");
+    ESP_LOGE(TAG, "DFU timed out at %" PRIu32 " of %" PRIu32 " bytes, DFU state: %u, status: %u", this->bytes_written_,
+             this->firmware_bin_length_, this->dfu_state_, this->dfu_status_);
     return UPDATE_TIMEOUT;
+  }
+  if (this->dfu_state_ == DFU_INT_DFU_ERROR) {
+    ESP_LOGE(TAG, "DFU failed at %" PRIu32 " of %" PRIu32 " bytes, DFU status: %u", this->bytes_written_,
+             this->firmware_bin_length_, this->dfu_status_);
+    return UPDATE_FAILED;
   }
 
   if (this->bytes_written_ < this->firmware_bin_length_) {
@@ -225,7 +238,7 @@ uint32_t RespeakerLite::load_buf_(uint8_t *buf, const uint8_t max_len, const uin
     buf_len = max_len;
   }
 
-  for (uint8_t i = 0; i < max_len; i++) {
+  for (uint32_t i = 0; i < buf_len; i++) {
     buf[i] = this->firmware_bin_[offset + i];
   }
   return buf_len;
@@ -239,6 +252,11 @@ bool RespeakerLite::versions_match_() {
   return this->firmware_bin_version_major_ == this->firmware_version_major_ &&
          this->firmware_bin_version_minor_ == this->firmware_version_minor_ &&
          this->firmware_bin_version_patch_ == this->firmware_version_patch_;
+}
+
+bool RespeakerLite::version_safe_to_update_() {
+  return encode_uint24(this->firmware_version_major_, this->firmware_version_minor_, this->firmware_version_patch_) >=
+         this->auto_update_min_version_;
 }
 
 bool RespeakerLite::dfu_get_status_() {

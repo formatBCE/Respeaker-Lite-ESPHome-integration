@@ -24,6 +24,7 @@ CONF_MUTE_STATE= "mute_state"
 CONF_FIRMWARE_VERSION= "firmware_version"
 CONF_FIRMWARE = "firmware"
 CONF_MD5 = "md5"
+CONF_AUTO_UPDATE_MIN_VERSION = "auto_update_min_version"
 CONF_ON_BEGIN = "on_begin"
 CONF_ON_END = "on_end"
 CONF_ON_PROGRESS = "on_progress"
@@ -81,6 +82,8 @@ CONFIG_SCHEMA = (
                     cv.Required(CONF_URL): cv.url,
                     cv.Required(CONF_VERSION): cv.version_number,
                     cv.Required(CONF_MD5): cv.All(cv.string, cv.Length(min=32, max=32)),
+                    # DFU of older XMOS firmware can erase its own factory image (issue #94)
+                    cv.Optional(CONF_AUTO_UPDATE_MIN_VERSION, default="1.0.8"): cv.version_number,
                     cv.Optional(CONF_ON_BEGIN): automation.validate_automation(
                         {
                             cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(
@@ -174,6 +177,14 @@ async def to_code(config):
                 int(firmware_version[0]),
                 int(firmware_version[1]),
                 int(firmware_version[2]),
+            )
+        )
+        min_version = config_fw[CONF_AUTO_UPDATE_MIN_VERSION].split(".")
+        cg.add(
+            var.set_auto_update_min_version(
+                int(min_version[0]),
+                int(min_version[1]),
+                int(min_version[2]),
             )
         )
 
