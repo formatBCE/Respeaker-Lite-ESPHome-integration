@@ -41,7 +41,9 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
 - `config/respeaker-satellite-dashboard-example.yaml` — the thin user config. It sets `respeaker_lite_ref` and imports
   the base package from `github://formatBCE/Respeaker-Lite-ESPHome-integration/...@${respeaker_lite_ref}`.
 - `esphome/components/respeaker_lite/` — the custom ESPHome external component (Python codegen plus C++).
-- `microwakeword/models/v2/` — the `kenobi` wake word model, served over raw GitHub URL.
+- `microwakeword/models/v2/` — the `kenobi` and `snooze` wake word models, served over raw GitHub URL at
+  `${satellite_core_ref}`. `snooze` was trained by @dlarkinsPonderosa (XVF3800 #59/#60); XVF3800 loads it from here
+  too, at its `respeaker_lite_ref`.
 - `sounds/` — the twelve built-in sounds: Ogg Opus copies (48 kbps mono) of the Voice PE sounds, CC BY 4.0
   (`sounds/LICENSE.md` holds the attribution and the ffmpeg command). `core/voice-assistant.yaml` gets them at
   `${satellite_core_ref}`. Keep them Opus: both media player pipelines are `format: FLAC`, so no MP3 file means no MP3
@@ -119,6 +121,22 @@ numbers come from the `substitutions:` block of `packages/core/base.yaml`.
 
 `packages/core/controls.yaml` does not touch a light. It calls three hook scripts that the device supplies:
 `control_leds_status_off`, `control_leds_factory_reset_coming_up`, and `control_leds_factory_reset_confirmed`.
+
+### Timers, alarm, and snooze
+
+`timer_ringing` (internal switch, `core/timers-alarm.yaml`) is the single ring path for HA timers and the alarm.
+`on_turn_on` enables the `stop` model (and `snooze` if `snooze_enabled`), starts the repeating ring and the
+`ring_timeout` script (15 min, `mode: restart`); `on_turn_off` stops that script and disables both models. Keep the
+timeout in a script: a `delay` inside `on_turn_on` keeps running after turn-off (ESPHome runs re-triggered automation
+delays in parallel) and cuts a later ring short.
+
+"Snooze" is handled in the ringing branch of `on_wake_word_detected`, matched by the model's `wake_word` string.
+`snooze_ring` stores an epoch deadline in the restored `snooze_until` global (0 = none) and turns the ring off. A 1 s
+`interval` turns `timer_ringing` on at the deadline and drops a deadline that is more than 15 min old (the device was
+off). Without a valid clock, "Snooze" is ignored and the ring continues. The `stop` model stays off during the snooze
+window on purpose, so a false "Stop" cannot lose a wake-up. `Cancel snooze`, setting `alarm_time`, turning
+`snooze_enabled` off, or turning `alarm_on` off clear the deadline. The `alarm_on` case is detected in that interval,
+not in `alarm_on`'s triggers, because Koala replaces those triggers with `then:` blocks.
 
 ### Audio pipeline
 

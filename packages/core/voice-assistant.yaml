@@ -97,6 +97,11 @@ micro_wake_word:
     - model: https://github.com/OHF-Voice/micro-wake-word/releases/download/stop/stop.json
       id: stop
       internal: true
+    # "Snooze": on only while a timer or the alarm rings, if "Snooze enabled" is
+    # on (timers-alarm.yaml). Model trained by @dlarkinsPonderosa.
+    - model: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/microwakeword/models/v2/snooze.json
+      id: snooze
+      internal: true
   vad:
     probability_cutoff: 0.05
   on_wake_word_detected:
@@ -109,11 +114,18 @@ micro_wake_word:
               id: send_wake_word_event
               wake_word: !lambda return wake_word;
           # If a timer is ringing: Stop it, do not start the voice assistant (We can stop timer from voice!)
+          # "Snooze" stops it too, and rings again later.
           - if:
               condition:
                 switch.is_on: timer_ringing
               then:
-                - switch.turn_off: timer_ringing
+                - if:
+                    condition:
+                      lambda: return wake_word == "Snooze";
+                    then:
+                      - script.execute: snooze_ring
+                    else:
+                      - switch.turn_off: timer_ringing
               # Stop voice assistant if running
               else:
                 - if:

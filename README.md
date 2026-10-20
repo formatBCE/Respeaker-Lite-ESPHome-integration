@@ -38,7 +38,8 @@ There are some additional things i've added for convenience:
 - sensors for next device timer properties (time is updated once per 5 sec, name is available if set);
 - TTS URI event `esphome.tts_uri`, sent to Home Assistant every time there's voice response (check out example automation to redirect response to other media player [here](readme/tts_uri.md));
 - STT text event `esphome.stt_text`, sent every time there's text of response available (you may use it to display readable response on your dashboard, for example);
-- daily alarm functionality, read more on it [here](readme/alarms.md).
+- daily alarm functionality, read more on it [here](readme/alarms.md);
+- "Snooze" for a ringing timer or alarm, read more on it [here](readme/alarms.md#snooze). The "Snooze" wake word model was trained by [dlarkinsPonderosa](https://github.com/dlarkinsPonderosa).
 
 ## Releases and updates
 Each release has a tag, for example `2026.9.1`. The [tags page](https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/tags) shows all releases.
@@ -59,7 +60,7 @@ The firmware is a set of packages in the [packages](/packages) directory:
 | `core/base.yaml` | Boot, network, API, and diagnostic entities |
 | `core/voice-assistant.yaml` | Wake word, voice pipeline, sounds, and Home Assistant events |
 | `core/media-player.yaml` | Media player, Sendspin, and audio ducking |
-| `core/timers-alarm.yaml` | Timers, daily alarm, and time zone |
+| `core/timers-alarm.yaml` | Timers, daily alarm, snooze, and time zone |
 | `core/controls.yaml` | User button actions and the Button press event |
 | `respeaker-lite/hardware.yaml` | ReSpeaker Lite board: audio, XMOS, and firmware update |
 | `lite/device.yaml` | XIAO ESP32-S3: user button pin and the RGB LED |
