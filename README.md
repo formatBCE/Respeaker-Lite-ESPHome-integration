@@ -88,7 +88,15 @@ button:
 ```
 
 ## DFU software auto-update
-Since version 2025.2.2, the firmware includes corresponding DFU firmware for Respeaker Lite board. On first start after update, new firmware will be installed to Respeaker automatically. You will see Respeaker LED flashing yellow, while installing, and green on successful install. So now there's no need to update DFU firmware. Woohoo!
+Since version 2025.2.2, the firmware includes the XMOS firmware for the ReSpeaker Lite board.
+
+**CAUTION:** Do not disconnect the power while the LED flashes white. An interrupted XMOS update can make the board stop working.
+
+At the first start after an update, the ESP32 installs the XMOS firmware automatically. The LED flashes white during the installation. The LED flashes green when the installation is complete.
+
+The automatic installation starts only if the XMOS firmware on the board is version 1.0.8 or newer. On older versions, the XMOS update can erase the factory firmware. The board then does not start, and its recovery needs a SOIC-8 clip programmer. Read [issue #94](https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/issues/94).
+
+If the XMOS firmware is older than 1.0.8, the ESP32 does not install the update. The LED shows the error state, and the log shows the version that the ESP32 found. To update the board, do step 3 of [What to do with it?](#what-to-do-with-it). The USB procedure uses the same XMOS update function, so the same risk can apply.
 
 ### Casing
 I made some casing to improve family approval factor. [Check it out.](casing/Casing.md)

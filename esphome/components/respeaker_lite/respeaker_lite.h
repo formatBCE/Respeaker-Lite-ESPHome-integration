@@ -8,6 +8,7 @@
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
 #include "esphome/core/hal.h"
+#include "esphome/core/helpers.h"
 
 namespace esphome {
 namespace respeaker_lite {
@@ -145,6 +146,9 @@ class RespeakerLite : public i2c::I2CDevice, public Component {
     this->firmware_bin_version_minor_ = minor;
     this->firmware_bin_version_patch_ = patch;
   }
+  void set_auto_update_min_version(uint8_t major, uint8_t minor, uint8_t patch) {
+    this->auto_update_min_version_ = encode_uint24(major, minor, patch);
+  }
 
   void start_dfu_update();
 
@@ -159,6 +163,7 @@ class RespeakerLite : public i2c::I2CDevice, public Component {
   bool firmware_bin_is_valid_() { return this->firmware_bin_ != nullptr && this->firmware_bin_length_; }
   bool version_read_();
   bool versions_match_();
+  bool version_safe_to_update_();
 
   bool dfu_get_status_();
   bool dfu_get_version_();
@@ -183,6 +188,7 @@ class RespeakerLite : public i2c::I2CDevice, public Component {
   uint8_t firmware_bin_version_major_{0};
   uint8_t firmware_bin_version_minor_{0};
   uint8_t firmware_bin_version_patch_{0};
+  uint32_t auto_update_min_version_{0};
 
   uint8_t firmware_version_major_{0};
   uint8_t firmware_version_minor_{0};
