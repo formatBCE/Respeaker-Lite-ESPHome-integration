@@ -7,6 +7,8 @@ This repository contains example code to integrate Seeed Respeaker Lite Voice Ki
 I'm thankful for continuous help of ESPHome team and Seeed developers, that let me put this thing together. 
 It's using [official code for Voice Preview Edition by ESPHome team](https://github.com/esphome/home-assistant-voice-pe), as well as firmware and guides from [Seeed Wiki](https://wiki.seeedstudio.com/xiao_respeaker/) and [their repository for Respeaker](https://github.com/respeaker/ReSpeaker_Lite/tree/master).
 
+The built-in sounds come from the Voice PE project. The sounds are © 2024 by Clayton Charles Tapp, under CC BY 4.0. The `sounds/` directory holds copies in Ogg Opus format. Read [sounds/LICENSE.md](sounds/LICENSE.md) for the changes.
+
 ## *Disclaimer
 ### Use this on your own risk. Expect breaking changes.
 Although Voice PE is released, parts of its code are still under active development. I will try to update YAML and XMOS board firmware as soon as i can, but it can't be instantenuous...
