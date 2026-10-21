@@ -24,10 +24,28 @@ __* Thanks to Mike aka @mikey60 and his fork to nabu_microphone, this project st
 2. [Solder USR to D2 and MUTE to D3 pins](https://wiki.seeedstudio.com/respeaker_button/). _**ATTENTION! This step is mandatory, as without it the buttons on satellite won't work as intended.**_
 3. [Flash 48kHz I2S firmware of version **not lower than 1.1.0** to the XMOS board](https://wiki.seeedstudio.com/xiao_respeaker/#flash-the-i2s-firmware) (pay attention to USB port, you need the main board port, not ESP32 one). Make sure you're using 48kHz version, as 16kHz version won't work with this repo. You can use included [firmware file](/respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin) to be sure.
 4. Flash the ESPHome firmware to the ESP32. Use the ESP32 USB port.
-   - Copy [the example configuration](/config/respeaker-satellite-dashboard-example.yaml) into ESPHome, and change it for your device.
+   - To install without a build, use the web installer. Read [Install with the web installer](#install-with-the-web-installer).
+   - To build the firmware yourself, copy [the example configuration](/config/respeaker-satellite-dashboard-example.yaml) into ESPHome, and change it for your device.
    - You do not need to download other files. The example gets the base configuration from this GitHub repository.
    - The example uses one release of this repository. The device does not change until you select a newer release. Read [Releases and updates](#releases-and-updates).
 5. Add device to Home Assistant.
+
+### Install with the web installer
+Use the web installer if you do not want to build the firmware. The firmware has no credentials. The device gets the Wi-Fi credentials through Improv over USB serial or over BLE. Do steps 1 to 3 above first.
+
+1. Open the [web installer](https://formatbce.github.io/Respeaker-Lite-ESPHome-integration/) in Chrome or Edge on a computer.
+2. Connect the computer to the USB port of the ESP32.
+3. Click **Connect**, and select the board.
+4. Install the firmware.
+5. Set the Wi-Fi credentials in the installer.
+
+As an alternative to step 5, add the device in Home Assistant with the [Improv via BLE](https://www.home-assistant.io/integrations/improv_ble/) integration. When Home Assistant asks for authorization, push the user button.
+
+After the Wi-Fi connection, the device stops BLE. If the device loses the Wi-Fi connection, BLE starts again.
+
+Home Assistant shows a firmware update when a new release is available. To change the configuration, adopt the device in the ESPHome dashboard. The dashboard imports `config/common/respeaker-satellite-base.yaml` at the release tag of the device.
+
+To build the same firmware yourself, run `esphome run config/respeaker-satellite-factory.yaml`. This build does not get updates from Home Assistant.
 
 ### Here are also some [useful blueprints to use with your satellite](readme/blueprints.md)
 
@@ -46,7 +64,9 @@ Each release has a tag, for example `2026.9.1`. The [tags page](https://github.c
 
 The `respeaker_lite_ref` substitution in your configuration selects the release. One value controls the base configuration, the `respeaker_lite` component, the wake word model, and the XMOS firmware.
 
-To update the device:
+A device that you installed with the web installer shows each new release as a firmware update in Home Assistant.
+
+To update a device that you built yourself:
 1. Set `respeaker_lite_ref` to the tag of the new release.
 2. Install the configuration on the device again.
 
