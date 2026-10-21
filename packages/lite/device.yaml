@@ -33,7 +33,15 @@ light:
     pin: GPIO1
     num_leds: 1
     rmt_symbols: 192
-    chipset: ws2812
+    # Explicit timings, as on the Voice PE. The ws2812 preset sends no reset, and
+    # newer LEDs drop a frame that follows the last one within 280 us (#88).
+    bit0_high: 300ns
+    bit0_low: 975ns
+    bit1_high: 650ns
+    bit1_low: 650ns
+    reset_low: 300us
+    reset_high: 0us
+    max_refresh_rate: 15ms
     default_transition_length: 0s
     effects:
       - addressable_lambda:
