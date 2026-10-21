@@ -12,7 +12,7 @@ substitutions:
   # It selects the respeaker_lite component, the wake word model, and the XMOS
   # firmware. Each release sets it to its own tag, so a pinned package stays
   # consistent. Set it to "main" to follow the newest code.
-  respeaker_lite_ref: 2026.10.0
+  respeaker_lite_ref: 2026.10.1
   # Ref of the patched i2s_audio fork. The stock component does not work.
   i2s_audio_ref: respeaker_microphone
 
