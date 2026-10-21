@@ -55,8 +55,9 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
 ## Important: the source of truth is GitHub, not the working tree
 
 `external_components` in `packages/respeaker-lite/hardware.yaml` pulls `respeaker_lite` from this repository at
-`ref: ${respeaker_lite_ref}`, and it pulls a patched `i2s_audio` from `formatBCE/esphome` at `ref: ${i2s_audio_ref}`
-(the `respeaker_microphone` branch). The XMOS firmware URL uses `${respeaker_lite_ref}`. The wake word model and sound URLs in
+`ref: ${respeaker_lite_ref}`. `i2s_audio` is the stock ESPHome component (the `formatBCE/esphome` fork is gone): the
+48 kHz `i2s_mics_raw` microphone feeds the `resampler` microphone `i2s_mics` at 16 kHz (ESPHome 2026.10.0 or newer).
+The XMOS firmware URL uses `${respeaker_lite_ref}`. The wake word model and sound URLs in
 the core use `${satellite_core_ref}`, which follows `respeaker_lite_ref`. The default of `respeaker_lite_ref` is the current
 release tag, not `main`.
 
@@ -163,7 +164,8 @@ again with `setenv("TZ", ...)`.
 
 ## Conventions
 
-- `esphome.min_version` tracks the ESPHome release that the firmware needs, for example `2026.9.0`.
+- `esphome.min_version` tracks the ESPHome release that the firmware needs, now `2026.10.0` (the `resampler`
+  microphone). Keep `ESPHOME_VERSION` in `.github/workflows/release.yaml` at or above it.
 - Releases use plain CalVer tags without a `v`, for example `2026.9.1`. To prepare a release, set the new version in
   three places: `esphome.project.version` in `packages/lite/device.yaml`, the `respeaker_lite_ref` default in
   `packages/respeaker-lite/hardware.yaml`, and `respeaker_lite_ref` in the example config. The default must equal the
