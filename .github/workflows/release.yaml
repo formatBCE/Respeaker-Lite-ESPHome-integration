@@ -21,7 +21,7 @@ permissions:
 
 env:
   # ESPHome for the configuration check. Raise it on purpose.
-  ESPHOME_VERSION: "2026.9.1"
+  ESPHOME_VERSION: "2026.10.0"
 
 jobs:
   release:

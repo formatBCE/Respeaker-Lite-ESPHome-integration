@@ -12,9 +12,7 @@ substitutions:
   # It selects the respeaker_lite component, the wake word model, and the XMOS
   # firmware. Each release sets it to its own tag, so a pinned package stays
   # consistent. Set it to "main" to follow the newest code.
-  respeaker_lite_ref: 2026.10.1
-  # Ref of the patched i2s_audio fork. The stock component does not work.
-  i2s_audio_ref: respeaker_microphone
+  respeaker_lite_ref: 2026.10.2
 
 esphome:
   on_shutdown:
@@ -150,8 +148,10 @@ i2s_audio:
       allow_other_uses: true
 
 microphone:
+  # The XMOS board drives the I2S clocks at 48 kHz for the speaker and the
+  # microphones together, so the microphones run at 48 kHz too.
   - platform: i2s_audio
-    id: i2s_mics
+    id: i2s_mics_raw
     i2s_din_pin: GPIO44
     adc_type: external
     pdm: false
@@ -160,7 +160,14 @@ microphone:
     i2s_mode: secondary
     i2s_audio_id: i2s_input
     channel: stereo
-      
+  # Voice assistant and wake word need 16 kHz. Both channels stay.
+  - platform: resampler
+    id: i2s_mics
+    microphone:
+      microphone: i2s_mics_raw
+      channels: [0, 1]
+    sample_rate: 16000
+
 speaker:
   # Hardware speaker output
   - platform: i2s_audio
@@ -217,13 +224,6 @@ respeaker_lite:
     md5: 9297155d1bf3eb21a9d4db52a89ea0c6
 
 external_components:
-  - source:
-      type: git
-      url: https://github.com/formatBCE/esphome
-      ref: ${i2s_audio_ref}
-    components:
-      - i2s_audio
-    refresh: 0s
   - source:
       type: git
       url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration
