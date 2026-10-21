@@ -8,7 +8,8 @@ This repository holds an ESPHome firmware definition for the Seeed ReSpeaker Lit
 XU316 audio front end). It is not an application with a build system. It is a YAML package plus one custom ESPHome
 component. Home Assistant users consume it as a remote package.
 
-There is no test suite and no linter configuration. The only CI workflow is `.github/workflows/release.yaml`, which tags releases.
+There is no test suite and no linter configuration. The only CI workflow is `.github/workflows/release.yaml`, which builds
+and publishes releases.
 
 ## Commands
 
@@ -32,7 +33,10 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
   - `core/` — the board-independent voice satellite: `base.yaml` (boot, network, API, phase globals), `voice-assistant.yaml`
     (wake word, pipeline, sounds, HA events), `media-player.yaml`, `timers-alarm.yaml`, and `controls.yaml` (the Voice PE
     button behavior). The core is meant to move to its own repository later, so it must not reference IDs of a board.
-    The header of `core/base.yaml` lists the IDs that a device must supply; `controls.yaml` lists its own.
+    The header of `core/base.yaml` lists the IDs that a device must supply and the `wake_word_start_hook` script that a
+    device can extend; `controls.yaml` lists its own IDs and holds the button sounds. Koala uses all five core packages.
+    Respeaker-XVF3800-ESPHome-integration uses all of them except `controls.yaml`: its `packages/base.yaml` includes them
+    as a nested remote package at its `respeaker_lite_ref`. A core change reaches both repositories on their next bump.
   - `respeaker-lite/hardware.yaml` — the ReSpeaker Lite board: ESP32-S3, I2C, I2S, mics, speaker chain, AIC3204, XMOS
     (`respeaker_lite` component, mute, DFU), external components. Koala uses this package too.
   - `lite/device.yaml` — the XIAO device: flash size, user button pin, the single LED and every `control_leds*` script,
@@ -40,14 +44,18 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
 - `config/common/respeaker-satellite-base.yaml` — includes all packages. Existing user configs import this path, so keep it.
 - `config/respeaker-satellite-dashboard-example.yaml` — the thin user config. It sets `respeaker_lite_ref` and imports
   the base package from `github://formatBCE/Respeaker-Lite-ESPHome-integration/...@${respeaker_lite_ref}`.
+- `config/respeaker-satellite-factory.yaml` — factory configuration without credentials, the same as Koala's and
+  XVF3800's: the base file, Improv over BLE (`improv_ble`, authorizer: `user_button`) and serial, BLE off while Wi-Fi is
+  up, `name_add_mac_suffix`, and `dashboard_import` of the base file at `${respeaker_lite_ref}`. The `ota: http_request`
+  and `update:` blocks stay commented out on purpose: the release workflow builds this file with ewt-gen, which adds
+  them. Do not uncomment them in a commit.
 - `esphome/components/respeaker_lite/` — the custom ESPHome external component (Python codegen plus C++).
 - `microwakeword/models/v2/` — the `kenobi` and `snooze` wake word models, served over raw GitHub URL at
-  `${satellite_core_ref}`. `snooze` was trained by @dlarkinsPonderosa (XVF3800 #59/#60); XVF3800 loads it from here
-  too, at its `respeaker_lite_ref`.
+  `${satellite_core_ref}`. `snooze` was trained by @dlarkinsPonderosa (XVF3800 #59/#60).
 - `sounds/` — the twelve built-in sounds: Ogg Opus copies (48 kbps mono) of the Voice PE sounds, CC BY 4.0
-  (`sounds/LICENSE.md` holds the attribution and the ffmpeg command). `core/voice-assistant.yaml` gets them at
+  (`sounds/LICENSE.md` holds the attribution and the ffmpeg command). `core/voice-assistant.yaml` and `core/controls.yaml` get them at
   `${satellite_core_ref}`. Keep them Opus: both media player pipelines are `format: FLAC`, so no MP3 file means no MP3
-  decoder in the build. A new MP3 or WAV sound adds that decoder back. Koala gets the sounds from this core.
+  decoder in the build. A new MP3 or WAV sound adds that decoder back. Koala and XVF3800 get the sounds from this core.
 - `respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin` — the XMOS firmware that the device flashes to itself.
 - `blueprints/automation/formatbce/` — Home Assistant automation blueprints, imported by raw GitHub URL.
 - `readme/`, `casing/` — user documentation and 3D print files.
@@ -167,12 +175,20 @@ again with `setenv("TZ", ...)`.
 - `esphome.min_version` tracks the ESPHome release that the firmware needs, now `2026.10.0` (the `resampler`
   microphone). Keep `ESPHOME_VERSION` in `.github/workflows/release.yaml` at or above it.
 - Releases use plain CalVer tags without a `v`, for example `2026.9.1`. To prepare a release, set the new version in
-  three places: `esphome.project.version` in `packages/lite/device.yaml`, the `respeaker_lite_ref` default in
-  `packages/respeaker-lite/hardware.yaml`, and `respeaker_lite_ref` in the example config. The default must equal the
-  tag, because a pinned package then gets the component, the model, and the firmware from the same release.
-- Push that commit to `main`. `.github/workflows/release.yaml` sees the new version in `packages/lite/device.yaml`,
-  checks the two refs and the configuration at the commit, and creates the tag and a GitHub release. A push without a
-  new version does nothing. Do not tag by hand.
+  four places: `esphome.project.version` in `packages/lite/device.yaml`, the `respeaker_lite_ref` default in
+  `packages/respeaker-lite/hardware.yaml`, and `respeaker_lite_ref` in the example config and in the factory config.
+  The default must equal the tag, because a pinned package then gets the component, the model, and the firmware from
+  the same release.
+- Push that commit to `main`. `.github/workflows/release.yaml` then works like XVF3800's: `prepare` reads the **first**
+  `version:` line of `packages/lite/device.yaml`, checks that the tag does not exist and that the three
+  `respeaker_lite_ref` values equal the version; `build` installs the pinned `ESPHOME_VERSION`, points the factory
+  config's `respeaker_lite_ref` at the commit SHA (the tag does not exist yet), and runs the pinned `ewt-gen`, which
+  compiles the firmware and whose `--import-url` pins adopted devices to the tag; `publish-pages` deploys the web
+  installer and `manifest.json` to `https://formatbce.github.io/Respeaker-Lite-ESPHome-integration` (factory devices
+  update from it); `release` creates the tag and the GitHub release with the binaries, only after Pages succeeded.
+  Pages must use "GitHub Actions" as its source. A push without a new version does nothing. Do not tag by hand.
+- Koala and XVF3800 releases need the Lite tag of their `respeaker_lite_ref`, so a failed Lite release blocks them. The
+  tag is created last, so a manual run (`workflow_dispatch`) of the failed version can finish it.
 - Blueprint files and model files are referenced by absolute raw GitHub URL. A rename breaks live installations.
 - New scripts that can overlap use `mode: restart`. See commit 3136cf7.
 - The `disable_buttons` switch guards every button automation. Add the same guard to a new button action.

@@ -1,0 +1,77 @@
+# =============================================================================
+# Respeaker Lite satellite — factory configuration
+#
+# Firmware without credentials. The device gets Wi-Fi through Improv over BLE
+# or USB serial. Push the user button to authorize Improv BLE.
+#
+# For your own build with secrets, use respeaker-satellite-dashboard-example.yaml.
+# =============================================================================
+
+substitutions:
+  # Release of this firmware. An adopted device imports the same release.
+  respeaker_lite_ref: 2026.10.3
+
+packages:
+  respeaker_satellite: !include common/respeaker-satellite-base.yaml
+  # BLE and Wi-Fi share the radio. Disable BLE while Wi-Fi is up, and wait for
+  # that before the voice assistant starts.
+  va_connected_wait_for_ble:
+    voice_assistant:
+      on_client_connected:
+        - wait_until:
+            not: ble.enabled
+        - delay: 2s
+    wifi:
+      on_disconnect:
+        - ble.enable:
+
+esphome:
+  name: respeaker-lite
+  friendly_name: ReSpeaker Lite
+  # Each device gets a unique name on the network.
+  name_add_mac_suffix: true
+
+dashboard_import:
+  package_import_url: github://formatBCE/Respeaker-Lite-ESPHome-integration/config/common/respeaker-satellite-base.yaml@${respeaker_lite_ref}
+  import_full_config: false
+
+wifi:
+  on_connect:
+    - delay: 5s
+    - ble.disable:
+    - script.execute: control_leds
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+# Commented out for auto-publishing: the release workflow builds this file with
+# ewt-gen, which adds these blocks. Uncomment them only for a manual build.
+
+# ota:
+#   - platform: http_request
+#     id: ota_http_request
+
+# http_request:
+
+# update:
+#   - platform: http_request
+#     name: Firmware Update
+#     update_interval: 30min
+#     source: https://formatbce.github.io/Respeaker-Lite-ESPHome-integration/manifest.json
+
+improv_serial:
+
+esp32_ble:
+
+improv_ble:
+  authorizer: user_button
+  on_start:
+    - lambda: id(improv_ble_in_progress) = true;
+    - script.execute: control_leds
+  on_provisioned:
+    - lambda: id(improv_ble_in_progress) = false;
+    - script.execute: control_leds
+  on_stop:
+    - lambda: id(improv_ble_in_progress) = false;
+    - script.execute: control_leds

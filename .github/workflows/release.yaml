@@ -1,8 +1,9 @@
 name: Release
 
 # A push to main that changes esphome.project.version in packages/lite/device.yaml
-# tags that version and creates a GitHub release. A push without a new version
-# does nothing. Run it by hand to add release notes text.
+# publishes that version: factory firmware and manifest on GitHub Pages, and a
+# GitHub release with a tag. A push without a new version does nothing. Run it
+# by hand to add a summary for the update entity.
 
 on:
   push:
@@ -11,80 +12,163 @@ on:
       - packages/lite/device.yaml
   workflow_dispatch:
     inputs:
-      notes:
-        description: "Text above the generated release notes (optional)"
+      summary:
+        description: "Short summary that the update entity in Home Assistant shows (optional)"
         required: false
         default: ""
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 env:
-  # ESPHome for the configuration check. Raise it on purpose.
+  PUBLISH_URL: https://formatbce.github.io/Respeaker-Lite-ESPHome-integration
+  FACTORY_YAML: config/respeaker-satellite-factory.yaml
+  # Build tools. Raise them on purpose, so that a release is reproducible.
   ESPHOME_VERSION: "2026.10.0"
+  EWT_GEN_VERSION: "1.6.1"
 
 jobs:
-  release:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release: ${{ steps.version.outputs.release }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read the version and look for its tag
+      - name: Read the version and look for its release
         id: version
         run: |
-          value() { grep -E "^[[:space:]]*$1:" "$2" | head -n1 | sed -E "s/.*$1:[[:space:]]*\"?([^\"]+)\"?[[:space:]]*\$/\\1/"; }
-          V=$(value version packages/lite/device.yaml)
+          V=$(grep -E '^[[:space:]]*version:' packages/lite/device.yaml | head -n1 \
+              | sed -E 's/.*version:[[:space:]]*"?([^"]+)"?[[:space:]]*$/\1/')
           test -n "$V" || { echo "::error::No esphome.project.version in packages/lite/device.yaml"; exit 1; }
           echo "version=$V" >> "$GITHUB_OUTPUT"
           if git ls-remote --exit-code --tags origin "refs/tags/$V" > /dev/null; then
             if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-              echo "::error::Tag $V exists. Bump esphome.project.version in packages/lite/device.yaml first."
+              echo "::error::Release $V exists. Bump esphome.project.version in packages/lite/device.yaml first."
               exit 1
             fi
-            echo "Tag $V exists. Nothing to release."
+            echo "Release $V exists. Nothing to publish."
             echo "release=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          else
+            echo "New version $V. Publishing."
+            echo "release=true" >> "$GITHUB_OUTPUT"
           fi
-          echo "release=true" >> "$GITHUB_OUTPUT"
-          for f in packages/respeaker-lite/hardware.yaml config/respeaker-satellite-dashboard-example.yaml; do
+
+      - name: Check that the release is consistent
+        if: steps.version.outputs.release == 'true'
+        run: |
+          V='${{ steps.version.outputs.version }}'
+          value() { grep -E "^[[:space:]]*$1:" "$2" | head -n1 | sed -E "s/.*$1:[[:space:]]*\"?([^\"]+)\"?[[:space:]]*\$/\\1/"; }
+          for f in packages/respeaker-lite/hardware.yaml config/respeaker-satellite-dashboard-example.yaml "$FACTORY_YAML"; do
             REF=$(value respeaker_lite_ref "$f")
             if [ "$REF" != "$V" ]; then
               echo "::error::respeaker_lite_ref in $f is '$REF'. Set it to $V."
               exit 1
             fi
           done
-          echo "New version $V. Releasing."
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
-        if: steps.version.outputs.release == 'true'
         with:
           python-version: "3.12"
 
-      - name: Check the configuration at this commit
-        if: steps.version.outputs.release == 'true'
-        # The tag does not exist yet, so the check uses the commit SHA as the ref.
-        # It resolves the component, the wake word model, and the XMOS firmware.
+      - name: Install the build tools
+        # ewt-gen uses the esphome on PATH, so this pins the ESPHome version.
+        run: pip install uv "esphome==$ESPHOME_VERSION"
+
+      - name: Point the build at this commit
+        # The respeaker_lite component, the XMOS firmware, the wake word models,
+        # and the sounds come from this repository at respeaker_lite_ref. The
+        # tag does not exist yet, so the build uses the commit SHA. The prepare
+        # job checked that the committed value is the version, and --import-url
+        # below still pins adopted devices to the tag.
+        run: sed -i -E "s/^(  respeaker_lite_ref:).*/\1 $GITHUB_SHA/" "$FACTORY_YAML"
+
+      - name: Build the factory and OTA firmware, and the site
+        env:
+          V: ${{ needs.prepare.outputs.version }}
+          SUMMARY: ${{ inputs.summary }}
         run: |
-          pip install "esphome==$ESPHOME_VERSION"
-          cat > "$RUNNER_TEMP/release-check.yaml" <<EOF
-          substitutions:
-            respeaker_lite_ref: $GITHUB_SHA
-          packages:
-            base: !include $GITHUB_WORKSPACE/config/common/respeaker-satellite-base.yaml
-          esphome:
-            name: release-check
-          wifi:
-            ssid: "ci"
-            password: "ci-password"
-          EOF
-          esphome config "$RUNNER_TEMP/release-check.yaml" > /dev/null
+          uvx "ewt-gen@$EWT_GEN_VERSION" "$FACTORY_YAML" \
+            --output dist \
+            --publish-url "$PUBLISH_URL" \
+            --fw-version "$V" \
+            --import-url "github://formatBCE/Respeaker-Lite-ESPHome-integration/config/common/respeaker-satellite-base.yaml@$V" \
+            --release-url "https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/releases/tag/$V" \
+            --release-summary "${SUMMARY:-Respeaker Lite Satellite $V}"
+          ls -la dist/
+
+      - name: Check the manifest
+        env:
+          V: ${{ needs.prepare.outputs.version }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib
+          v = os.environ["V"]
+          m = json.loads(pathlib.Path("dist/manifest.json").read_text())
+          assert m["version"] == v, f"manifest version {m['version']} is not {v}"
+          b = m["builds"][0]
+          for part in b["parts"]:
+              assert pathlib.Path("dist", part["path"]).is_file(), part
+          assert "ota" in b, "manifest has no ota entry, so devices cannot update"
+          assert pathlib.Path("dist", b["ota"]["path"]).is_file(), b["ota"]
+          print(json.dumps(m, indent=2))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: dist/
+
+  publish-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: dist/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  release:
+    needs: [prepare, build, publish-pages]
+    runs-on: ubuntu-latest
+    env:
+      V: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: dist/
 
       - name: Create the tag and the GitHub release
-        if: steps.version.outputs.release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.version }}
+          tag_name: ${{ env.V }}
           target_commitish: ${{ github.sha }}
-          name: ${{ steps.version.outputs.version }}
-          body: ${{ inputs.notes }}
+          name: ${{ env.V }}
+          body: ${{ inputs.summary }}
           generate_release_notes: true
+          files: |
+            dist/firmware-*.bin

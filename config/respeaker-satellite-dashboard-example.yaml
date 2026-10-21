@@ -1,7 +1,7 @@
 substitutions:
   # Release of the satellite firmware. To update the device, set a newer release.
   # The README lists the releases and explains how to follow "main".
-  respeaker_lite_ref: 2026.10.2
+  respeaker_lite_ref: 2026.10.3
 
 packages:
   respeaker-satellite: github://formatBCE/Respeaker-Lite-ESPHome-integration/config/common/respeaker-satellite-base.yaml@${respeaker_lite_ref}

@@ -15,10 +15,6 @@ substitutions:
   mute_switch_off_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/mute_switch_off.opus
   timer_finished_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/timer_finished.opus
   wake_word_triggered_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/wake_word_triggered.opus
-  center_button_press_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/center_button_press.opus
-  center_button_double_press_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/center_button_double_press.opus
-  center_button_triple_press_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/center_button_triple_press.opus
-  center_button_long_press_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/center_button_long_press.opus
   factory_reset_initiated_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/factory_reset_initiated.opus
   factory_reset_cancelled_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/factory_reset_cancelled.opus
   factory_reset_confirmed_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/factory_reset_confirmed.opus
@@ -52,14 +48,6 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
 
 audio_file:
-  - id: center_button_press_sound
-    file: ${center_button_press_sound_file}
-  - id: center_button_double_press_sound
-    file: ${center_button_double_press_sound_file}
-  - id: center_button_triple_press_sound
-    file: ${center_button_triple_press_sound_file}
-  - id: center_button_long_press_sound
-    file: ${center_button_long_press_sound_file}
   - id: factory_reset_initiated_sound
     file: ${factory_reset_initiated_sound_file}
   - id: factory_reset_cancelled_sound
@@ -123,8 +111,14 @@ micro_wake_word:
                     condition:
                       lambda: return wake_word == "Snooze";
                     then:
+                      - logger.log:
+                          level: INFO
+                          format: "Wake word: snoozing the ringing timer"
                       - script.execute: snooze_ring
                     else:
+                      - logger.log:
+                          level: INFO
+                          format: "Wake word ignored: stopping the ringing timer"
                       - switch.turn_off: timer_ringing
               # Stop voice assistant if running
               else:
@@ -132,7 +126,10 @@ micro_wake_word:
                     condition:
                       voice_assistant.is_running:
                     then:
-                      voice_assistant.stop:
+                      - logger.log:
+                          level: INFO
+                          format: "Wake word ignored: stopping the running voice assistant"
+                      - voice_assistant.stop:
                     # Stop any other media player announcement
                     else:
                       - if:
@@ -140,6 +137,9 @@ micro_wake_word:
                             media_player.is_announcing:
                               id: external_media_player
                           then:
+                            - logger.log:
+                                level: INFO
+                                format: "Wake word ignored: stopping the announcement"
                             - media_player.stop:
                                 announcement: true
                                 id: external_media_player
@@ -156,6 +156,12 @@ micro_wake_word:
                                   - delay: 300ms
                             - voice_assistant.start:
                                 wake_word: !lambda return wake_word;
+                            # Device hook, empty here. See the script below.
+                            - script.execute: wake_word_start_hook
+        else:
+          - logger.log:
+              level: INFO
+              format: "Wake word ignored: microphone is muted"
 
 select:
   - platform: template
@@ -300,7 +306,31 @@ voice_assistant:
     - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
     - script.execute: control_leds
 
+interval:
+  # micro_wake_word stops for good after an inference or allocation error, and
+  # only on_client_connected starts it. Restart it so the device is not left deaf.
+  - interval: 10s
+    then:
+      - if:
+          condition:
+            and:
+              - voice_assistant.connected:
+              - lambda: return !id(init_in_progress);
+              - not:
+                  micro_wake_word.is_running:
+          then:
+            - logger.log:
+                level: WARN
+                format: "Wake word detection stopped, restarting it"
+            - micro_wake_word.start:
+
 script:
+  # Runs after a wake word started the voice assistant. It does nothing here.
+  # A device package adds actions with "- id: !extend wake_word_start_hook".
+  # The XVF3800 locks its beam to the speaker direction.
+  - id: wake_word_start_hook
+    then: []
+
   # Script executed when we want to play sounds on the device.
   - id: play_sound
     parameters:

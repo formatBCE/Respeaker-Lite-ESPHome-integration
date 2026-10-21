@@ -11,6 +11,12 @@
 #   switch      mic_mute_switch
 #   script      control_leds                     (the LED dispatcher)
 # controls.yaml expects more IDs. Its header lists them.
+#
+# The core supplies one hook for the device packages. The core runs it, and it
+# is empty until a device extends it with "- id: !extend <hook>":
+#   script      wake_word_start_hook             (after a wake word started the voice assistant)
+#
+# Koala Satellite and the Respeaker XVF3800 integration also use these packages.
 # =============================================================================
 
 substitutions:
