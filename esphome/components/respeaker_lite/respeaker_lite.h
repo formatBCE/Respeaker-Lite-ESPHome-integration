@@ -116,7 +116,9 @@ class RespeakerLite : public i2c::I2CDevice, public Component {
     return this->is_failed() || (this->version_read_() && (this->versions_match_() || !this->firmware_bin_is_valid_()));
   }
   void dump_config() override;
-  float get_setup_priority() const override { return setup_priority::HARDWARE - 1; }
+  // Below LightState (HARDWARE - 1): can_proceed() blocks setup, and the DFU automations and LED scripts
+  // drive lights meanwhile, so the lights must be set up first. Above TemplateSwitch (HARDWARE - 2).
+  float get_setup_priority() const override { return setup_priority::HARDWARE - 1.5f; }
   void loop() override;
 
 #ifdef USE_RESPEAKER_LITE_STATE_CALLBACK
