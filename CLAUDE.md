@@ -32,7 +32,10 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
   - `core/` — the board-independent voice satellite: `base.yaml` (boot, network, API, phase globals), `voice-assistant.yaml`
     (wake word, pipeline, sounds, HA events), `media-player.yaml`, `timers-alarm.yaml`, and `controls.yaml` (the Voice PE
     button behavior). The core is meant to move to its own repository later, so it must not reference IDs of a board.
-    The header of `core/base.yaml` lists the IDs that a device must supply; `controls.yaml` lists its own.
+    The header of `core/base.yaml` lists the IDs that a device must supply and the `wake_word_start_hook` script that a
+    device can extend; `controls.yaml` lists its own IDs and holds the button sounds. Koala uses all five core packages.
+    Respeaker-XVF3800-ESPHome-integration uses all of them except `controls.yaml`: its `packages/base.yaml` includes them
+    as a nested remote package at its `respeaker_lite_ref`. A core change reaches both repositories on their next bump.
   - `respeaker-lite/hardware.yaml` — the ReSpeaker Lite board: ESP32-S3, I2C, I2S, mics, speaker chain, AIC3204, XMOS
     (`respeaker_lite` component, mute, DFU), external components. Koala uses this package too.
   - `lite/device.yaml` — the XIAO device: flash size, user button pin, the single LED and every `control_leds*` script,
@@ -42,12 +45,11 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
   the base package from `github://formatBCE/Respeaker-Lite-ESPHome-integration/...@${respeaker_lite_ref}`.
 - `esphome/components/respeaker_lite/` — the custom ESPHome external component (Python codegen plus C++).
 - `microwakeword/models/v2/` — the `kenobi` and `snooze` wake word models, served over raw GitHub URL at
-  `${satellite_core_ref}`. `snooze` was trained by @dlarkinsPonderosa (XVF3800 #59/#60); XVF3800 loads it from here
-  too, at its `respeaker_lite_ref`.
+  `${satellite_core_ref}`. `snooze` was trained by @dlarkinsPonderosa (XVF3800 #59/#60).
 - `sounds/` — the twelve built-in sounds: Ogg Opus copies (48 kbps mono) of the Voice PE sounds, CC BY 4.0
-  (`sounds/LICENSE.md` holds the attribution and the ffmpeg command). `core/voice-assistant.yaml` gets them at
+  (`sounds/LICENSE.md` holds the attribution and the ffmpeg command). `core/voice-assistant.yaml` and `core/controls.yaml` get them at
   `${satellite_core_ref}`. Keep them Opus: both media player pipelines are `format: FLAC`, so no MP3 file means no MP3
-  decoder in the build. A new MP3 or WAV sound adds that decoder back. Koala gets the sounds from this core.
+  decoder in the build. A new MP3 or WAV sound adds that decoder back. Koala and XVF3800 get the sounds from this core.
 - `respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin` — the XMOS firmware that the device flashes to itself.
 - `blueprints/automation/formatbce/` — Home Assistant automation blueprints, imported by raw GitHub URL.
 - `readme/`, `casing/` — user documentation and 3D print files.

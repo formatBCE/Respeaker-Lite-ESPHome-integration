@@ -221,6 +221,7 @@ sensor:
     device_class: duration
     unit_of_measurement: s
     icon: "mdi:timer"
+    accuracy_decimals: 0
 
 text_sensor:
   - platform: template
@@ -256,12 +257,15 @@ voice_assistant:
         id(next_timer).publish_state(-1);
         id(next_timer_name).publish_state("-");
   on_timer_started:
-    - script.execute: control_leds
     - lambda: |
-        id(next_timer).publish_state(id(first_active_timer).seconds_left);
-        id(next_timer_name).publish_state(id(first_active_timer).name);
-  on_timer_cancelled:
+        id(check_if_timers_active).execute();
+        if (id(is_timer_active)) {
+          id(fetch_first_active_timer).execute();
+          id(next_timer).publish_state(id(first_active_timer).seconds_left);
+          id(next_timer_name).publish_state(id(first_active_timer).name);
+        }
     - script.execute: control_leds
+  on_timer_cancelled:
     - lambda: |
         id(check_if_timers_active).execute();
         if (id(is_timer_active)) {
@@ -272,18 +276,24 @@ voice_assistant:
           id(next_timer).publish_state(-1);
           id(next_timer_name).publish_state("-");
         }
+    - script.execute: control_leds
   on_timer_updated:
-    - script.execute: control_leds
     - lambda: |
-        id(next_timer).publish_state(id(first_active_timer).seconds_left);
-        id(next_timer_name).publish_state(id(first_active_timer).name);
-  on_timer_tick:
+        id(check_if_timers_active).execute();
+        if (id(is_timer_active)) {
+          id(fetch_first_active_timer).execute();
+          id(next_timer).publish_state(id(first_active_timer).seconds_left);
+          id(next_timer_name).publish_state(id(first_active_timer).name);
+        }
     - script.execute: control_leds
-    - lambda: | 
+  on_timer_tick:
+    - lambda: |
+        id(fetch_first_active_timer).execute();
         int seconds_left = id(first_active_timer).seconds_left;
         if (std::abs(seconds_left) % 5 == 0) {
-          id(next_timer).publish_state(seconds_left); 
+          id(next_timer).publish_state(seconds_left);
         }
+    - script.execute: control_leds
 
 script:
   # Stops a ring after 15 minutes. timer_ringing's on_turn_off stops this script.
@@ -397,8 +407,14 @@ script:
       - homeassistant.event:
           event: esphome.alarm_ringing
   - id: publish_current_time
+    mode: single
     then:
       - lambda: |-
-          // Publish current time
+          // Publish the current time only when it changed
+          static std::string last_time_string = "";
           auto time_now = id(homeassistant_time).now();
-          id(current_time).publish_state(time_now.strftime("%H:%M"));
+          std::string current_time_string = time_now.strftime("%H:%M");
+          if (current_time_string != last_time_string) {
+            id(current_time).publish_state(current_time_string);
+            last_time_string = current_time_string;
+          }

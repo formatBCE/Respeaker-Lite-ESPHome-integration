@@ -61,9 +61,11 @@ The firmware is a set of packages in the [packages](/packages) directory:
 | `core/voice-assistant.yaml` | Wake word, voice pipeline, sounds, and Home Assistant events |
 | `core/media-player.yaml` | Media player, Sendspin, and audio ducking |
 | `core/timers-alarm.yaml` | Timers, daily alarm, snooze, and time zone |
-| `core/controls.yaml` | User button actions and the Button press event |
+| `core/controls.yaml` | User button actions, button sounds, and the Button press event |
 | `respeaker-lite/hardware.yaml` | ReSpeaker Lite board: audio, XMOS, and firmware update |
 | `lite/device.yaml` | XIAO ESP32-S3: user button pin and the RGB LED |
+
+[Koala Satellite](https://github.com/formatBCE/Koala-Satellite) and the [Respeaker XVF3800 integration](https://github.com/formatBCE/Respeaker-XVF3800-ESPHome-integration) also use the `core/` packages. A change to a core package changes these devices too.
 
 The example configuration includes all packages through `config/common/respeaker-satellite-base.yaml`. You can change the result in your own configuration. You do not need to copy the files.
 
