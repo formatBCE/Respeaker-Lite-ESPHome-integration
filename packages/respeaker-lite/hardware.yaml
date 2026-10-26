@@ -12,7 +12,7 @@ substitutions:
   # It selects the respeaker_lite component, the wake word model, and the XMOS
   # firmware. Each release sets it to its own tag, so a pinned package stays
   # consistent. Set it to "main" to follow the newest code.
-  respeaker_lite_ref: 2026.10.3
+  respeaker_lite_ref: 2026.10.4
 
 esphome:
   on_shutdown:
@@ -160,13 +160,14 @@ microphone:
     i2s_mode: secondary
     i2s_audio_id: i2s_input
     channel: stereo
-  # Voice assistant and wake word need 16 kHz. Both channels stay.
-  - platform: resampler
+  # Voice assistant and wake word need 16 kHz. Both channels stay. The XMOS
+  # output has no content above 8 kHz, so this keeps 1 frame of 3 with no
+  # filter. The stock resampler cuts 4 to 7.5 kHz by 2 to 17 dB.
+  - platform: decimator
     id: i2s_mics
     microphone:
       microphone: i2s_mics_raw
       channels: [0, 1]
-    sample_rate: 16000
 
 speaker:
   # Hardware speaker output
@@ -228,8 +229,9 @@ external_components:
       type: git
       url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration
       ref: ${respeaker_lite_ref}
-    components: 
+    components:
       - respeaker_lite
+      - decimator
     refresh: 0s
 
 audio_dac:
