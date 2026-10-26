@@ -50,6 +50,8 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
   and `update:` blocks stay commented out on purpose: the release workflow builds this file with ewt-gen, which adds
   them. Do not uncomment them in a commit.
 - `esphome/components/respeaker_lite/` — the custom ESPHome external component (Python codegen plus C++).
+- `esphome/components/decimator/` — the `decimator` microphone platform: 48 kHz XMOS output to 16 kHz, 1 frame of 3.
+  Shared: the XVF3800 repository loads it from here at its `respeaker_lite_ref`, so a change reaches XVF on its next bump.
 - `microwakeword/models/v2/` — the `kenobi` and `snooze` wake word models, served over raw GitHub URL at
   `${satellite_core_ref}`. `snooze` was trained by @dlarkinsPonderosa (XVF3800 #59/#60).
 - `sounds/` — the twelve built-in sounds: Ogg Opus copies (48 kbps mono) of the Voice PE sounds, CC BY 4.0
@@ -62,9 +64,13 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
 
 ## Important: the source of truth is GitHub, not the working tree
 
-`external_components` in `packages/respeaker-lite/hardware.yaml` pulls `respeaker_lite` from this repository at
-`ref: ${respeaker_lite_ref}`. `i2s_audio` is the stock ESPHome component (the `formatBCE/esphome` fork is gone): the
-48 kHz `i2s_mics_raw` microphone feeds the `resampler` microphone `i2s_mics` at 16 kHz (ESPHome 2026.10.0 or newer).
+`external_components` in `packages/respeaker-lite/hardware.yaml` pulls `respeaker_lite` and `decimator` from this
+repository at `ref: ${respeaker_lite_ref}`. `i2s_audio` is the stock ESPHome component (the `formatBCE/esphome` fork is
+gone): the 48 kHz `i2s_mics_raw` microphone feeds the `decimator` microphone `i2s_mics`, which keeps 1 frame of 3 with
+no filter. This is exact because the XMOS firmware processes at 16 kHz, so the 48 kHz stream has no content above
+8 kHz. Do not switch back to the stock `resampler` microphone: with esp-audio-libs 4.0.1 and 16 taps it cuts 4 kHz by
+2 dB, 6 kHz by 8 dB and 7.5 kHz by 17 dB (two pre-filter biquads at 6.7 kHz, not configurable), which degrades the
+wake word and STT (XVF3800 issue #69). The old fork did the same 1-of-3 decimation inside `i2s_audio`.
 The XMOS firmware URL uses `${respeaker_lite_ref}`. The wake word model and sound URLs in
 the core use `${satellite_core_ref}`, which follows `respeaker_lite_ref`. The default of `respeaker_lite_ref` is the current
 release tag, not `main`.
@@ -172,8 +178,7 @@ again with `setenv("TZ", ...)`.
 
 ## Conventions
 
-- `esphome.min_version` tracks the ESPHome release that the firmware needs, now `2026.10.0` (the `resampler`
-  microphone). Keep `ESPHOME_VERSION` in `.github/workflows/release.yaml` at or above it.
+- `esphome.min_version` tracks the ESPHome release that the firmware needs, now `2026.10.0`. Keep `ESPHOME_VERSION` in `.github/workflows/release.yaml` at or above it.
 - Releases use plain CalVer tags without a `v`, for example `2026.9.1`. To prepare a release, set the new version in
   four places: `esphome.project.version` in `packages/lite/device.yaml`, the `respeaker_lite_ref` default in
   `packages/respeaker-lite/hardware.yaml`, and `respeaker_lite_ref` in the example config and in the factory config.

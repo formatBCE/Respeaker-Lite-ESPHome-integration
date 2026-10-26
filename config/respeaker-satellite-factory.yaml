@@ -9,7 +9,7 @@
 
 substitutions:
   # Release of this firmware. An adopted device imports the same release.
-  respeaker_lite_ref: 2026.10.3
+  respeaker_lite_ref: 2026.10.4
 
 packages:
   respeaker_satellite: !include common/respeaker-satellite-base.yaml
