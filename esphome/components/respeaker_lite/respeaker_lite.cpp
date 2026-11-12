@@ -8,6 +8,7 @@
 #include "esphome/core/hal.h"
 
 #include <cinttypes>
+#include <cstdio>
 
 namespace esphome {
 namespace respeaker_lite {
@@ -300,8 +301,11 @@ bool RespeakerLite::dfu_get_version_() {
     return false;
   }
 
-  std::string version = str_sprintf("%u.%u.%u", version_resp[1], version_resp[2], version_resp[3]);
-  ESP_LOGI(TAG, "DFU version: %s", version.c_str());
+  // Three uint8_t values need at most "255.255.255" plus the null terminator.
+  char version[12];
+  std::snprintf(version, sizeof(version), "%u.%u.%u", static_cast<unsigned>(version_resp[1]),
+                static_cast<unsigned>(version_resp[2]), static_cast<unsigned>(version_resp[3]));
+  ESP_LOGI(TAG, "DFU version: %s", version);
   this->firmware_version_major_ = version_resp[1];
   this->firmware_version_minor_ = version_resp[2];
   this->firmware_version_patch_ = version_resp[3];
