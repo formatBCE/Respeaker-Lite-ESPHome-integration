@@ -30,7 +30,7 @@ env:
   PUBLISH_URL: https://formatbce.github.io/Respeaker-Lite-ESPHome-integration
   FACTORY_YAML: config/respeaker-satellite-factory.yaml
   # Build tools. Raise them on purpose, so that a release is reproducible.
-  ESPHOME_VERSION: "2026.10.0"
+  ESPHOME_VERSION: "2026.11.0"
   EWT_GEN_VERSION: "1.6.1"
 
 jobs:

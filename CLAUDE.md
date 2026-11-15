@@ -145,6 +145,10 @@ numbers come from the `substitutions:` block of `packages/core/base.yaml`.
 timeout in a script: a `delay` inside `on_turn_on` keeps running after turn-off (ESPHome runs re-triggered automation
 delays in parallel) and cuts a later ring short.
 
+A template switch runs `on_turn_on` and `on_turn_off` before it publishes the new state. So in those triggers,
+`id(timer_ringing).state` still has the old value. Give the new state to a script as a parameter, as the calls of
+`apply_wake_word_sensitivity` do.
+
 "Snooze" is handled in the ringing branch of `on_wake_word_detected`, matched by the model's `wake_word` string.
 `snooze_ring` stores an epoch deadline in the restored `snooze_until` global (0 = none) and turns the ring off. A 1 s
 `interval` turns `timer_ringing` on at the deadline and drops a deadline that is more than 15 min old (the device was
@@ -152,6 +156,14 @@ off). Without a valid clock, "Snooze" is ignored and the ring continues. The `st
 window on purpose, so a false "Stop" cannot lose a wake-up. `Cancel snooze`, setting `alarm_time`, turning
 `snooze_enabled` off, or turning `alarm_on` off clear the deadline. The `alarm_on` case is detected in that interval,
 not in `alarm_on`'s triggers, because Koala replaces those triggers with `then:` blocks.
+
+### Wake word verification
+
+Home Assistant can ask for wake word audio when it can verify all active wake words. Then
+`id(va).is_wake_word_audio_active()` is true, and `apply_wake_word_sensitivity` sets lower cutoffs on `okay_nabu`,
+`hey_jarvis` and `hey_mycroft`. The device plays no wake sound and ducks media only after Home Assistant accepts the
+wake word. A rejection (`on_wake_word_rejected`) sets the idle phase. A ringing timer keeps the normal cutoffs, because
+it stops on any wake word without verification. `kenobi`, `stop` and `snooze` keep the cutoffs of their models.
 
 ### Audio pipeline
 
@@ -178,7 +190,10 @@ again with `setenv("TZ", ...)`.
 
 ## Conventions
 
-- `esphome.min_version` tracks the ESPHome release that the firmware needs, now `2026.10.0`. Keep `ESPHOME_VERSION` in `.github/workflows/release.yaml` at or above it.
+- `esphome.min_version` tracks the ESPHome release that the firmware needs, now `2026.11.0`. Keep `ESPHOME_VERSION` in `.github/workflows/release.yaml` at or above it.
+- ESPHome 2026.11 does not include wake word audio (esphome/esphome#21885). So `core/voice-assistant.yaml` gets `api`,
+  `micro_wake_word` and `voice_assistant` from the ESPHome commit that merged it, the same as Voice PE. Remove that
+  `external_components` block when `min_version` becomes the first ESPHome release that includes the PR.
 - Releases use plain CalVer tags without a `v`, for example `2026.9.1`. To prepare a release, set the new version in
   four places: `esphome.project.version` in `packages/lite/device.yaml`, the `respeaker_lite_ref` default in
   `packages/respeaker-lite/hardware.yaml`, and `respeaker_lite_ref` in the example config and in the factory config.
