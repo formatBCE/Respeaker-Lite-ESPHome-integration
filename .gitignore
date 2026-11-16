@@ -1,0 +1,4 @@
+local/
+*.pyc
+.esphome/
+secrets.yaml

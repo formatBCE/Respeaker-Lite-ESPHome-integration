@@ -1,0 +1,18 @@
+# =============================================================================
+# Respeaker XVF3800 satellite — timers and alarm package
+#
+# The core (Respeaker-Lite-ESPHome-integration packages/core/timers-alarm.yaml)
+# holds the timers, the alarm clock, the snooze, the time zone, and the clock
+# entities. This package adds the timer animation of the LED ring.
+#
+# Keep this file. Existing configurations list it in their package files.
+# =============================================================================
+
+# This list adds to the core trigger, so it runs after the core actions.
+voice_assistant:
+  on_timer_tick:
+    - if:
+        condition:
+          lambda: return id(current_led_effect) == "timer_tick";
+        then:
+          - script.execute: control_leds_timer_ticking

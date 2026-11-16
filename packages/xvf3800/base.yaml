@@ -1,0 +1,151 @@
+# =============================================================================
+# Respeaker XVF3800 satellite — base package
+#
+# The voice satellite core, node identity, ESP32-S3 build options, the I2C bus,
+# and the external components.
+#
+# The core comes from Respeaker-Lite-ESPHome-integration at respeaker_lite_ref:
+# boot and connection logic, the voice pipeline, the media player, the timers,
+# the alarm, and the sounds. The packages of this repository add the XVF3800
+# hardware and extend the core items with "id: !extend <id>".
+#
+# This package declares the substitution defaults for the whole project.
+# Override any of them in your own configuration.
+# =============================================================================
+
+substitutions:
+  # --- Node identity -------------------------------------------------------
+  name: respeaker-xvf3800-assistant
+  friendly_name: reSpeaker XVF3800 Assistant
+
+  # --- Source refs ---------------------------------------------------------
+  # Release of this repository: a tag such as 2026.9.1, a branch, or a commit.
+  # It selects the C++ components and the DFU firmware. Each release sets it to
+  # its own tag, so a pinned package stays consistent. Set it to "main" to
+  # follow the newest code.
+  respeaker_ref: 2026.11.0
+  # Release of Respeaker-Lite-ESPHome-integration that holds the voice
+  # satellite core, the sounds, and the kenobi and snooze wake word models.
+  respeaker_lite_ref: 2026.10.4
+
+  # --- Tuning --------------------------------------------------------------
+  # The core sets hidden_ssid ("true" if your network does not broadcast its
+  # SSID) and the voice assistant phase IDs.
+  log_level: INFO
+
+packages:
+  # The core merges first, so a value in the packages of this repository wins.
+  satellite_core:
+    url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration
+    ref: ${respeaker_lite_ref}
+    refresh: 1d
+    files:
+      - packages/core/base.yaml
+      - packages/core/voice-assistant.yaml
+      - packages/core/media-player.yaml
+      - packages/core/timers-alarm.yaml
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  project:
+    name: formatbce.Respeaker XVF3800 Satellite
+    version: 2026.11.0
+
+esp32:
+  board: esp32-s3-devkitc-1
+  cpu_frequency: 240MHz
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+    version: recommended
+    sdkconfig_options:
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+      CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+
+      # Moves instructions and read only data from flash into PSRAM on boot.
+      # Both enabled allows instructions to execute while a flash operation is in progress without needing to be placed in IRAM.
+      # Considerably speeds up mWW at the cost of using more PSRAM.
+      CONFIG_SPIRAM_RODATA: "y"
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
+
+      CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+      CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"  # TLS1.3 support isn't enabled by default in IDF 5.1.5
+
+
+# Credentials are not set here. A remote package cannot read secrets.
+# Supply "ssid" and "password" from your own configuration. The two blocks merge.
+wifi:
+  # Add power management and connection optimizations
+  power_save_mode: none  # Disable power saving for better performance
+  reboot_timeout: 10min  # Prevent unnecessary reboots
+
+logger:
+  level: ${log_level}
+  initial_level: ${log_level}
+  logs:
+    sensor: WARN
+    voice_assistant: INFO
+    micro_wake_word: INFO
+    i2s_audio: WARN
+    respeaker_xvf3800: INFO
+
+api:
+  actions:
+    - action: set_led_color
+      variables:
+        red: float
+        green: float
+        blue: float
+      then:
+        # The "LED Ring" light is the one authority for the color. Push the
+        # color into the light and let its on_state trigger write the color
+        # globals and repaint the ring.
+        #
+        # The light keeps the largest component at full and moves the level to
+        # the brightness axis. The hue stays the same.
+        - lambda: |-
+            float r = std::min(255.0f, std::max(0.0f, red));
+            float g = std::min(255.0f, std::max(0.0f, green));
+            float b = std::min(255.0f, std::max(0.0f, blue));
+            auto call = id(led_ring_light).make_call();
+            call.set_rgb(r / 255.0f, g / 255.0f, b / 255.0f);
+            call.perform();
+        - select.set:
+            id: user_led_color_preset
+            option: "Custom"
+
+i2c:
+  - id: internal_i2c
+    sda: GPIO5
+    scl: GPIO6
+    scan: true
+    frequency: 400kHz
+
+psram:
+  mode: octal
+  speed: 80MHz
+  ignore_not_found: false  # The VPE has PSRAM, so this is safe. Allows configuring WiFi driver to use more resources (done automatically by the speaker media player)
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/formatBCE/Respeaker-XVF3800-ESPHome-integration
+      ref: ${respeaker_ref}
+    components:
+      - respeaker_xvf3800
+      - aic3104
+    refresh: 0s
+  # The decimator microphone, shared with the Respeaker Lite.
+  - source:
+      type: git
+      url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration
+      ref: ${respeaker_lite_ref}
+    components:
+      - decimator
+    refresh: 0s

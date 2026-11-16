@@ -1,0 +1,92 @@
+# =============================================================================
+# Respeaker XVF3800 satellite — voice assistant package
+#
+# The XVF3800 additions to the voice assistant of the core: the beam lock, the
+# voice direction sensor, the wake word gain, and the volume range and volume
+# display of the media player.
+#
+# The core (Respeaker-Lite-ESPHome-integration packages/core/) holds the wake
+# word detection, the voice pipeline, the media player, and the sounds. The
+# sound URLs are substitutions there. Override any of them to use your own files.
+# =============================================================================
+
+switch:
+  # Beam Lock. When on, the XVF3800 beam is pinned to the wake-word direction
+  # for the duration of command capture (released on STT VAD end). Off by default
+  # because fixed-beam mode is a behavioural change worth opting into deliberately.
+  - platform: template
+    id: beam_lock_enabled
+    name: Beam lock
+    icon: "mdi:target-account"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+sensor:
+  # Voice Direction. The direction of the wake word in degrees, published once
+  # per wake word by wake_word_start_hook, never from the 10 Hz beam poll.
+  # force_update gives one state per wake word, also for an unchanged direction.
+  - platform: template
+    id: voice_direction
+    name: Voice Direction
+    icon: "mdi:compass-outline"
+    unit_of_measurement: "°"
+    accuracy_decimals: 0
+    disabled_by_default: true
+    force_update: true
+    update_interval: never
+
+micro_wake_word:
+  microphone:
+    # The XVF3800 always used the default gain of 1. The core sets 4 for the
+    # Respeaker Lite.
+    gain_factor: 1
+
+script:
+  # The core runs this hook after a wake word started the voice assistant.
+  - id: !extend wake_word_start_hook
+    then:
+      # Pin the AEC beam to the wake-word direction before any other sound
+      # source can steal it. Gated by the user-facing switch so the feature is
+      # opt-in.
+      - if:
+          condition:
+            switch.is_on: beam_lock_enabled
+          then:
+            - lambda: id(respeaker).lock_beam();
+      # One state per wake word, after the lock, so it is the locked direction.
+      - lambda: |-
+          const float degrees = id(respeaker).get_azimuth_degrees();
+          if (!std::isnan(degrees)) {
+            id(voice_direction).publish_state(degrees);
+          }
+
+# These lists add to the core triggers, so they run after the core actions.
+voice_assistant:
+  on_stt_vad_end:
+    # Release the beam as soon as command capture is over, so the stop-word
+    # detector can still hear the user from anywhere in the room during TTS.
+    - lambda: id(respeaker).unlock_beam();
+  on_end:
+    # Safety-net unlock: covers paths where on_stt_vad_end never fired
+    # (pipeline error mid-capture, abort, etc.). Idempotent.
+    - lambda: id(respeaker).unlock_beam();
+
+media_player:
+  # The full volume range, and the volume display on the LED ring.
+  - id: !extend external_media_player
+    volume_min: 0.0
+    volume_max: 1.0
+    on_mute:
+      - delay: 100ms  # Debounce
+      - script.execute: control_leds_volume_changed
+    on_unmute:
+      - delay: 100ms  # Debounce
+      - script.execute: control_leds_volume_changed
+    on_volume:
+      if:
+        condition:
+          - lambda: return !id(init_in_progress);
+        then:
+          - delay: 100ms  # Debounce
+          - script.execute: control_leds_volume_changed

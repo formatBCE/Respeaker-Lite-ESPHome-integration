@@ -1,0 +1,45 @@
+# =============================================================================
+# Respeaker XVF3800 voice satellite — example configuration
+#
+# This file holds only the settings that belong to your device. The rest comes
+# from the packages in this repository.
+#
+# Before you build this file, put a secrets.yaml next to it. Copy
+# secrets.yaml.example to secrets.yaml and set your own values.
+# =============================================================================
+
+substitutions:
+  name: respeaker-xvf3800-assistant
+  friendly_name: reSpeaker XVF3800 Assistant
+
+  # Release of this repository. It selects the YAML packages below, the C++
+  # components, and the DFU firmware. To update the device, set a newer
+  # release. The README lists the releases and explains how to follow "main".
+  respeaker_ref: 2026.11.0
+
+packages:
+  respeaker:
+    url: https://github.com/formatBCE/Respeaker-XVF3800-ESPHome-integration
+    ref: ${respeaker_ref}
+    refresh: 1d
+    files:
+      - packages/base.yaml
+      - packages/hardware.yaml
+      - packages/voice-assistant.yaml
+      - packages/leds.yaml
+      - packages/timers-alarm.yaml
+
+# A remote package cannot read secrets, so the credentials go here.
+# ESPHome joins these blocks with the blocks in the packages.
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+    password: !secret ota_password

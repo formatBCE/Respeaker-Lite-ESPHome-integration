@@ -1,0 +1,276 @@
+# =============================================================================
+# Respeaker XVF3800 satellite — hardware package
+#
+# Board-fixed configuration: I2S buses and pins, microphone, speaker chain,
+# the XMOS XVF3800 DSP, and the TLV320AIC3104 codec.
+#
+# Do not change the pins. They are fixed by the board layout.
+#
+# This package adds its own on_boot handler. ESPHome joins the on_boot lists
+# from every package, so the handler in base.yaml also runs.
+# =============================================================================
+
+esphome:
+  on_boot:
+    # The DSP component blocks startup until the firmware is current or the
+    # component failed, so the result is final here. on_error sets the update
+    # failure text before this runs.
+    - priority: 600
+      then:
+        - lambda: |-
+            if (!id(respeaker).is_failed()) {
+              id(dsp_status).publish_state("OK");
+            } else if (!id(dsp_status).has_state()) {
+              id(dsp_status).publish_state("No response");
+            }
+
+i2s_audio:
+  - id: i2s_output
+    i2s_lrclk_pin:
+      number: GPIO7
+      allow_other_uses: true
+    i2s_bclk_pin:
+      number: GPIO8
+      allow_other_uses: true
+    # i2s_mclk_pin:
+    #   number: GPIO9
+    #   allow_other_uses: true
+
+  - id: i2s_input
+    i2s_lrclk_pin:
+      number: GPIO7
+      allow_other_uses: true
+    i2s_bclk_pin:
+      number: GPIO8
+      allow_other_uses: true
+    # i2s_mclk_pin:
+    #   number: GPIO9
+    #   allow_other_uses: true
+
+microphone:
+  # The I2S clocks run at 48 kHz for the speaker and the microphones together,
+  # so the microphones run at 48 kHz too.
+  - platform: i2s_audio
+    id: i2s_mics_raw
+    i2s_din_pin: GPIO43
+    adc_type: external
+    pdm: false
+    sample_rate: 48000
+    bits_per_sample: 32bit
+    i2s_mode: secondary
+    i2s_audio_id: i2s_input
+    channel: stereo
+  # Voice assistant and wake word need 16 kHz. Both channels stay. The DSP
+  # output has no content above 8 kHz, so this keeps 1 frame of 3 with no
+  # filter. The stock resampler cuts 4 to 7.5 kHz by 2 to 17 dB.
+  - platform: decimator
+    id: i2s_mics
+    microphone:
+      microphone: i2s_mics_raw
+      channels: [0, 1]
+
+speaker:
+  # Hardware speaker output
+  - platform: i2s_audio
+    id: i2s_audio_speaker
+    sample_rate: 48000
+    i2s_mode: secondary
+    i2s_dout_pin: GPIO44
+    bits_per_sample: 32bit
+    i2s_audio_id: i2s_output
+    dac_type: external
+    channel: stereo
+    timeout: never
+    buffer_duration: 100ms
+    audio_dac: aic3104_dac
+
+  # Virtual speakers to combine the announcement and media streams together into one output
+  - platform: mixer
+    id: mixing_speaker
+    output_speaker: i2s_audio_speaker
+    num_channels: 2
+    task_stack_in_psram: true
+    source_speakers:
+      - id: announcement_mixing_input
+        timeout: never
+      - id: media_mixing_input
+        timeout: never
+
+  # Virtual speakers to resample each pipelines' audio, if necessary, as the mixer speaker requires the same sample rate
+  - platform: resampler
+    id: announcement_resampling_speaker
+    output_speaker: announcement_mixing_input
+    sample_rate: 48000
+    bits_per_sample: 16
+  - platform: resampler
+    id: media_resampling_speaker
+    output_speaker: media_mixing_input
+    sample_rate: 48000
+    bits_per_sample: 16
+
+respeaker_xvf3800:
+  id: respeaker
+  address: 0x2C
+  mute_switch:
+    id: mic_mute_switch
+    name: "Microphone Mute"
+    update_interval: 1s
+    on_turn_on:
+      - if:
+          condition:
+            and:
+              - lambda: return !id(init_in_progress);
+              - switch.is_on: mute_sound
+          then:
+            - script.execute:
+                id: play_sound
+                priority: false
+                sound_file: "mute_switch_on_sound"
+      - script.execute: control_leds
+    on_turn_off:
+      - if:
+          condition:
+            and:
+              - lambda: return !id(init_in_progress);
+              - switch.is_on: mute_sound
+          then:
+            - script.execute:
+                id: play_sound
+                priority: false
+                sound_file: "mute_switch_off_sound"
+      - script.execute: control_leds
+  dfu_version:
+    name: "Firmware Version"
+    update_interval: 120s
+  led_beam_sensor:
+    name: "Voice Beam Direction"
+    id: beam_direction
+    internal: true
+    # One non-blocking read per poll. The DSP answers CTRL_WAIT during silence;
+    # the next poll is the retry, so keep this fast enough to track a speaker.
+    # This poll is also the azimuth source for beam lock. Set update_interval to
+    # never, and the Beam lock switch stops working.
+    update_interval: 100ms
+  # The DSP mutes the microphones on a press by itself. The ESP reads the button
+  # only for the factory reset hold and for Improv BLE authorization.
+  mute_button:
+    id: mute_button
+    internal: true
+    update_interval: 50ms
+    on_release:
+      - if:
+          condition:
+            lambda: return id(factory_reset_phase) == 2;
+          then:
+            - button.press: factory_reset_button
+    on_multi_click:
+      # Factory reset warning. The press toggled mute in the DSP, so toggle it
+      # back: a hold of 10 s or more never changes mute.
+      - timing:
+          - ON for at least 10s
+        then:
+          - switch.toggle: mic_mute_switch
+          - lambda: id(factory_reset_phase) = 1;
+          - script.execute: control_leds
+          - script.execute:
+              id: play_sound
+              priority: true
+              sound_file: "factory_reset_initiated_sound"
+          - wait_until:
+              binary_sensor.is_off: mute_button
+          - if:
+              condition:
+                lambda: return id(factory_reset_phase) != 2;
+              then:
+                - lambda: id(factory_reset_phase) = 0;
+                - script.execute: control_leds
+                - script.execute:
+                    id: play_sound
+                    priority: true
+                    sound_file: "factory_reset_cancelled_sound"
+      # Factory reset confirmed. The reset runs when the button is released.
+      - timing:
+          - ON for at least 22s
+        then:
+          - script.execute:
+              id: play_sound
+              priority: true
+              sound_file: "factory_reset_confirmed_sound"
+          - lambda: id(factory_reset_phase) = 2;
+          - script.execute: control_leds
+  firmware:
+    url: https://github.com/formatBCE/Respeaker-XVF3800-ESPHome-integration/raw/${respeaker_ref}/respeaker_xvf3800_i2s_master_v1.0.9_48k.bin
+    version: "1.0.9"
+    md5: b62766ccf8fbbaf924d0d13beace495b
+    on_error:
+      - lambda: id(dsp_status).publish_state("Update failed");
+
+globals:
+  # Mute button hold: 0 = none, 1 = warning (10 s), 2 = confirmed (22 s).
+  # The reset runs on release in phase 2.
+  - id: factory_reset_phase
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+text_sensor:
+  # Result of the DSP firmware check at boot: OK, Update failed, or No response.
+  - platform: template
+    id: dsp_status
+    name: "DSP Status"
+    entity_category: diagnostic
+    icon: "mdi:chip"
+    update_interval: never
+
+audio_dac:
+  - platform: aic3104
+    id: aic3104_dac
+    i2c_id: internal_i2c
+
+number:
+  # Gain on the ASR output. It always affects wake word; it affects STT only
+  # when the route sends the ASR output to STT.
+  - platform: template
+    name: "ASR output gain"
+    id: asr_out_gain
+    optimistic: true
+    restore_value: yes
+    initial_value: 1.0
+    min_value: 1.0
+    max_value: 8.0
+    step: 0.1
+    entity_category: config
+    icon: "mdi:microphone-message"
+    on_value:
+      - lambda: id(respeaker).set_asr_out_gain(x);
+  # Maximum gain of the comms path's AGC. The comms output feeds STT on the
+  # default route, so this raises STT there; it does not affect the ASR output.
+  - platform: template
+    name: "AGC max gain (comms)"
+    id: agc_max_gain
+    optimistic: true
+    restore_value: yes
+    initial_value: 32.0
+    min_value: 1.0
+    max_value: 125.0
+    step: 1
+    entity_category: config
+    icon: "mdi:auto-fix"
+    on_value:
+      - lambda: id(respeaker).set_agc_max_gain(x);
+
+select:
+  # channel 0 -> STT, channel 1 -> micro_wake_word.
+  - platform: template
+    name: "DSP route"
+    id: dsp_route
+    optimistic: true
+    restore_value: yes
+    initial_option: "Comms to STT, ASR to wake word"
+    entity_category: config
+    icon: "mdi:call-split"
+    options:
+      - "ASR to STT and wake word"
+      - "Comms to STT, ASR to wake word"
+    on_value:
+      - lambda: id(respeaker).set_asr_route(i == 0);
