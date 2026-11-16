@@ -60,7 +60,8 @@ binary, so it also proves that all URLs and the MD5 checksum are correct.
   decoder in the build. A new MP3 or WAV sound adds that decoder back. Koala and XVF3800 get the sounds from this core.
 - `respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin` — the XMOS firmware that the device flashes to itself.
 - `blueprints/automation/formatbce/` — Home Assistant automation blueprints, imported by raw GitHub URL.
-- `readme/`, `casing/` — user documentation and 3D print files.
+- `readme/` — user documentation of the shared features. `readme/<device>/` and `casing/<device>/` — the documentation
+  and the 3D print files of one device (`lite`, `xvf3800`, `koala`).
 
 ## Important: the source of truth is GitHub, not the working tree
 

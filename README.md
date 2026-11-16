@@ -9,6 +9,8 @@ It's using [official code for Voice Preview Edition by ESPHome team](https://git
 
 The built-in sounds come from the Voice PE project. The sounds are © 2024 by Clayton Charles Tapp, under CC BY 4.0. The `sounds/` directory holds copies in Ogg Opus format. Read [sounds/LICENSE.md](sounds/LICENSE.md) for the changes.
 
+The code in this repository uses the ESPHome license. Read [LICENSE.md](LICENSE.md).
+
 ## *Disclaimer
 ### Use this on your own risk. Expect breaking changes.
 Although Voice PE is released, parts of its code are still under active development. I will try to update YAML and XMOS board firmware as soon as i can, but it can't be instantenuous...
@@ -124,7 +126,7 @@ The automatic installation starts only if the XMOS firmware on the board is vers
 If the XMOS firmware is older than 1.0.8, the ESP32 does not install the update. The LED shows the error state, and the log shows the version that the ESP32 found. To update the board, do step 3 of [What to do with it?](#what-to-do-with-it). The USB procedure uses the same XMOS update function, so the same risk can apply.
 
 ### Casing
-I made some casing to improve family approval factor. [Check it out.](casing/Casing.md)
+I made some casing to improve family approval factor. [Check it out.](casing/lite/Casing.md)
 
 
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/formatbce)
