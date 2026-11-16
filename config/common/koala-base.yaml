@@ -1,0 +1,18 @@
+# =============================================================================
+# Koala Satellite — all packages
+#
+# The voice satellite core and the ReSpeaker Lite hardware, then the Koala
+# device package, which adds the Koala hardware. The factory firmware and the
+# dashboard configuration both include this file.
+#
+# The order is important: a later package overrides a value of an earlier one.
+# =============================================================================
+
+packages:
+  core_base: !include ../../packages/core/base.yaml
+  core_voice_assistant: !include ../../packages/core/voice-assistant.yaml
+  core_media_player: !include ../../packages/core/media-player.yaml
+  core_timers_alarm: !include ../../packages/core/timers-alarm.yaml
+  core_controls: !include ../../packages/core/controls.yaml
+  respeaker_lite_hardware: !include ../../packages/respeaker-lite/hardware.yaml
+  koala_device: !include ../../packages/koala/device.yaml

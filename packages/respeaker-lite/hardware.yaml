@@ -7,12 +7,7 @@
 # Do not change the pins. The board layout sets them.
 # =============================================================================
 
-substitutions:
-  # Release of this repository: a tag such as 2026.9.1, a branch, or a commit.
-  # It selects the respeaker_lite component, the wake word model, and the XMOS
-  # firmware. Each release sets it to its own tag, so a pinned package stays
-  # consistent. Set it to "main" to follow the newest code.
-  respeaker_lite_ref: 2026.11.1
+# respeaker_lite_ref comes from packages/core/base.yaml.
 
 esphome:
   on_shutdown:
@@ -220,14 +215,14 @@ respeaker_lite:
     internal: false
     id: firmware_version
   firmware:
-    url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/raw/${respeaker_lite_ref}/respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin
+    url: https://github.com/formatBCE/Respeaker-ESPHome-integration/raw/${respeaker_lite_ref}/respeaker_lite_i2s_dfu_firmware_48k_v1.1.0.bin
     version: "1.1.0"
     md5: 9297155d1bf3eb21a9d4db52a89ea0c6
 
 external_components:
   - source:
       type: git
-      url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration
+      url: https://github.com/formatBCE/Respeaker-ESPHome-integration
       ref: ${respeaker_lite_ref}
     components:
       - respeaker_lite

@@ -32,7 +32,7 @@ esphome:
   name_add_mac_suffix: true
 
 dashboard_import:
-  package_import_url: github://formatBCE/Respeaker-Lite-ESPHome-integration/config/common/respeaker-satellite-base.yaml@${respeaker_lite_ref}
+  package_import_url: github://formatBCE/Respeaker-ESPHome-integration/config/common/respeaker-satellite-base.yaml@${respeaker_lite_ref}
   import_full_config: false
 
 wifi:
@@ -58,7 +58,7 @@ ota:
 #   - platform: http_request
 #     name: Firmware Update
 #     update_interval: 30min
-#     source: https://formatbce.github.io/Respeaker-Lite-ESPHome-integration/manifest.json
+#     source: https://formatbce.github.io/Respeaker-ESPHome-integration/lite/manifest.json
 
 improv_serial:
 

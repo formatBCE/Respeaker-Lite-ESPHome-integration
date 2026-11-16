@@ -1,9 +1,10 @@
 name: Release
 
 # A push to main that changes esphome.project.version in packages/lite/device.yaml
-# publishes that version: factory firmware and manifest on GitHub Pages, and a
-# GitHub release with a tag. A push without a new version does nothing. Run it
-# by hand to add a summary for the update entity.
+# publishes that version for every device: the factory firmware and the
+# manifests on GitHub Pages (one subpath per device), and one GitHub release
+# with a tag. A push without a new version does nothing. Run it by hand to add a
+# summary for the update entity.
 
 on:
   push:
@@ -27,8 +28,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PUBLISH_URL: https://formatbce.github.io/Respeaker-Lite-ESPHome-integration
-  FACTORY_YAML: config/respeaker-satellite-factory.yaml
+  REPO: formatBCE/Respeaker-ESPHome-integration
+  # Each device publishes to SITE_URL/<device>. Factory devices update from the
+  # manifest.json there, so never change a device's path.
+  SITE_URL: https://formatbce.github.io/Respeaker-ESPHome-integration
   # Build tools. Raise them on purpose, so that a release is reproducible.
   ESPHOME_VERSION: "2026.11.0"
   EWT_GEN_VERSION: "1.6.1"
@@ -65,19 +68,51 @@ jobs:
         if: steps.version.outputs.release == 'true'
         run: |
           V='${{ steps.version.outputs.version }}'
-          value() { grep -E "^[[:space:]]*$1:" "$2" | head -n1 | sed -E "s/.*$1:[[:space:]]*\"?([^\"]+)\"?[[:space:]]*\$/\\1/"; }
-          for f in packages/respeaker-lite/hardware.yaml config/respeaker-satellite-dashboard-example.yaml "$FACTORY_YAML"; do
-            REF=$(value respeaker_lite_ref "$f")
-            if [ "$REF" != "$V" ]; then
-              echo "::error::respeaker_lite_ref in $f is '$REF'. Set it to $V."
-              exit 1
+          fail=0
+          # check <key> <file>: the first "<key>:" line of <file> must hold the version.
+          check() {
+            value=$(grep -E "^[[:space:]]*$1:" "$2" | head -n1 | sed -E "s/.*$1:[[:space:]]*\"?([^\"]+)\"?[[:space:]]*\$/\\1/")
+            if [ "$value" != "$V" ]; then
+              echo "::error file=$2::$1 is '$value'. Set it to $V."
+              fail=1
             fi
+          }
+          check respeaker_lite_ref packages/core/base.yaml
+          for f in packages/lite/device.yaml packages/xvf3800/base.yaml packages/koala/device.yaml; do
+            check version "$f"
           done
+          for f in config/respeaker-satellite-dashboard-example.yaml config/respeaker-xvf-satellite-example.yaml \
+                   config/koala-dashboard.yaml config/respeaker-satellite-factory.yaml \
+                   config/respeaker-xvf-satellite-factory.yaml config/koala-satellite.yaml; do
+            check respeaker_lite_ref "$f"
+          done
+          exit $fail
 
   build:
     needs: prepare
     if: needs.prepare.outputs.release == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      # One version for all devices: a failed device stops the release.
+      fail-fast: true
+      matrix:
+        include:
+          - device: lite
+            factory: config/respeaker-satellite-factory.yaml
+            import: config/common/respeaker-satellite-base.yaml
+            title: Respeaker Lite Satellite
+          - device: xvf3800
+            factory: config/respeaker-xvf-satellite-factory.yaml
+            import: config/common/respeaker-xvf-satellite-base.yaml
+            title: Respeaker XVF3800 Satellite
+          - device: koala
+            factory: config/koala-satellite.yaml
+            import: config/common/koala-base.yaml
+            title: Koala Satellite
+    env:
+      V: ${{ needs.prepare.outputs.version }}
+      DEVICE: ${{ matrix.device }}
+      FACTORY_YAML: ${{ matrix.factory }}
     steps:
       - uses: actions/checkout@v4
 
@@ -90,30 +125,40 @@ jobs:
         run: pip install uv "esphome==$ESPHOME_VERSION"
 
       - name: Point the build at this commit
-        # The respeaker_lite component, the XMOS firmware, the wake word models,
-        # and the sounds come from this repository at respeaker_lite_ref. The
-        # tag does not exist yet, so the build uses the commit SHA. The prepare
-        # job checked that the committed value is the version, and --import-url
+        # The components, the XMOS firmware, the wake word models, and the
+        # sounds come from this repository at respeaker_lite_ref. The tag does
+        # not exist yet, so the build uses the commit SHA. The prepare job
+        # checked that the committed value is the version, and --import-url
         # below still pins adopted devices to the tag.
         run: sed -i -E "s/^(  respeaker_lite_ref:).*/\1 $GITHUB_SHA/" "$FACTORY_YAML"
 
       - name: Build the factory and OTA firmware, and the site
         env:
-          V: ${{ needs.prepare.outputs.version }}
           SUMMARY: ${{ inputs.summary }}
+          IMPORT_FILE: ${{ matrix.import }}
+          TITLE: ${{ matrix.title }}
         run: |
           uvx "ewt-gen@$EWT_GEN_VERSION" "$FACTORY_YAML" \
             --output dist \
-            --publish-url "$PUBLISH_URL" \
+            --publish-url "$SITE_URL/$DEVICE" \
             --fw-version "$V" \
-            --import-url "github://formatBCE/Respeaker-Lite-ESPHome-integration/config/common/respeaker-satellite-base.yaml@$V" \
-            --release-url "https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/releases/tag/$V" \
-            --release-summary "${SUMMARY:-Respeaker Lite Satellite $V}"
+            --import-url "github://$REPO/$IMPORT_FILE@$V" \
+            --release-url "https://github.com/$REPO/releases/tag/$V" \
+            --release-summary "${SUMMARY:-$TITLE $V}"
           ls -la dist/
 
+      - name: Check the update source
+        # Devices follow this URL after the update, so a wrong value strands them.
+        run: |
+          F="${FACTORY_YAML%.yaml}.factory.yaml"
+          WANT="$SITE_URL/$DEVICE/manifest.json"
+          if ! grep -qxF "    source: $WANT" "$F"; then
+            echo "::error file=$F::The update source is not $WANT."
+            cat "$F"
+            exit 1
+          fi
+
       - name: Check the manifest
-        env:
-          V: ${{ needs.prepare.outputs.version }}
         run: |
           python - <<'PY'
           import json, os, pathlib
@@ -130,7 +175,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: site
+          name: site-${{ matrix.device }}
           path: dist/
 
   publish-pages:
@@ -140,14 +185,28 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: site
+
       - uses: actions/download-artifact@v4
         with:
-          name: site
-          path: dist/
+          pattern: site-*
+          path: artifacts/
+
+      - name: Put each device in its subpath
+        run: |
+          mkdir public
+          cp site/index.html public/
+          for a in artifacts/site-*; do
+            cp -R "$a" "public/${a#artifacts/site-}"
+          done
+          find public -type f | sort
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist/
+          path: public/
       - id: deploy
         uses: actions/deploy-pages@v4
 
@@ -159,8 +218,20 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: site
-          path: dist/
+          pattern: site-*
+          path: artifacts/
+
+      - name: Name the binaries by device
+        # ewt-gen gives every device the same file names. The Pages manifests
+        # use those names, so only the release copies get the device prefix.
+        run: |
+          mkdir assets
+          for a in artifacts/site-*; do
+            for f in "$a"/firmware-*.bin; do
+              cp "$f" "assets/${a#artifacts/site-}-$(basename "$f")"
+            done
+          done
+          ls -la assets/
 
       - name: Create the tag and the GitHub release
         uses: softprops/action-gh-release@v2
@@ -171,4 +242,4 @@ jobs:
           body: ${{ inputs.summary }}
           generate_release_notes: true
           files: |
-            dist/firmware-*.bin
+            assets/*.bin

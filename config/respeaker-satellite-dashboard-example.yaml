@@ -4,7 +4,7 @@ substitutions:
   respeaker_lite_ref: 2026.11.1
 
 packages:
-  respeaker-satellite: github://formatBCE/Respeaker-Lite-ESPHome-integration/config/common/respeaker-satellite-base.yaml@${respeaker_lite_ref}
+  respeaker-satellite: github://formatBCE/Respeaker-ESPHome-integration/config/common/respeaker-satellite-base.yaml@${respeaker_lite_ref}
 
 esphome:
   name: respeaker-satellite

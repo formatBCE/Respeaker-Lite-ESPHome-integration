@@ -1,0 +1,35 @@
+sequence:
+  - variables:
+      v_action: >-
+        {{ (states['assist_satellite'] |map(attribute='entity_id') |select('in',
+        device_entities(f_device)) |first).replace('assist_satellite.',
+        'esphome.').replace("assist_satellite", "set_led_color") }}
+      v_red: "{{ f_rgb_color[0] }}"
+      v_green: "{{ f_rgb_color[1] }}"
+      v_blue: "{{ f_rgb_color[2] }}"
+  - action: "{{ v_action }}"
+    data:
+      red: "{{ v_red }}"
+      green: "{{ v_green }}"
+      blue: "{{ v_blue }}"
+fields:
+  f_rgb_color:
+    selector:
+      color_rgb: {}
+    default:
+      - 255
+      - 255
+      - 255
+    name: RGB color
+    required: true
+  f_device:
+    selector:
+      device:
+        filter:
+          - model: Respeaker XVF3800 Satellite
+            manufacturer: formatbce
+            integration: esphome
+    required: true
+    name: XVF-3800 device
+alias: Set XVF-3800 LED color
+description: ""

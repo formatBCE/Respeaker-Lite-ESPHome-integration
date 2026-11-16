@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Respeaker ESPHome satellites</title>
+  <style>
+    :root { color-scheme: light dark; --fg: #1d1d1f; --bg: #fff; --muted: #6e6e73; --card: #f5f5f7; --link: #0a66c2; }
+    @media (prefers-color-scheme: dark) {
+      :root { --fg: #f5f5f7; --bg: #111; --muted: #a1a1a6; --card: #1d1d1f; --link: #6cb4ff; }
+    }
+    body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+    main { max-width: 40rem; margin: 0 auto; padding: 2rem 1rem; }
+    h1 { font-size: 1.6rem; margin: 0 0 .5rem; }
+    p { color: var(--muted); margin: 0 0 1.5rem; }
+    a.device { display: block; padding: 1rem 1.25rem; margin-bottom: .75rem; border-radius: .75rem;
+               background: var(--card); color: var(--link); text-decoration: none; font-weight: 600; }
+    a.device span { display: block; color: var(--muted); font-weight: 400; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Respeaker ESPHome satellites</h1>
+    <p>Select your device to install the firmware. The installer needs Chrome or Edge on a computer.</p>
+    <a class="device" href="lite/">Respeaker Lite<span>Seeed ReSpeaker Lite Voice Kit with the XIAO ESP32-S3</span></a>
+    <a class="device" href="xvf3800/">Respeaker XVF3800<span>Seeed ReSpeaker XVF3800 USB 4-Mic Array with the XIAO ESP32-S3</span></a>
+    <a class="device" href="koala/">Koala Satellite<span>ESP32-S3 board with the ReSpeaker Lite board</span></a>
+    <p><a href="https://github.com/formatBCE/Respeaker-ESPHome-integration">Source code and documentation</a></p>
+  </main>
+</body>
+</html>
