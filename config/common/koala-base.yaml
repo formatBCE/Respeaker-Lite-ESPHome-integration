@@ -1,0 +1,31 @@
+# =============================================================================
+# Koala Satellite — all packages
+#
+# The voice satellite core and the ReSpeaker Lite hardware come from
+# Respeaker-Lite-ESPHome-integration at respeaker_lite_ref. The Koala device
+# package adds the Koala hardware. The factory firmware and the dashboard
+# configuration both include this file.
+#
+# The order is important: a later package overrides a value of an earlier one.
+# =============================================================================
+
+substitutions:
+  # Release of Respeaker-Lite-ESPHome-integration that this firmware uses: a tag
+  # such as 2026.9.2, a branch, or a commit. It selects the core packages, the
+  # ReSpeaker Lite hardware package, the respeaker_lite component, the wake
+  # word model, and the XMOS firmware.
+  respeaker_lite_ref: 2026.11.0
+
+packages:
+  respeaker_lite:
+    url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration
+    ref: ${respeaker_lite_ref}
+    refresh: 1d
+    files:
+      - packages/core/base.yaml
+      - packages/core/voice-assistant.yaml
+      - packages/core/media-player.yaml
+      - packages/core/timers-alarm.yaml
+      - packages/core/controls.yaml
+      - packages/respeaker-lite/hardware.yaml
+  koala_device: !include ../../packages/koala/device.yaml

@@ -1,0 +1,14 @@
+# =============================================================================
+# Respeaker XVF3800 voice satellite — all packages
+#
+# The factory firmware includes this file, and a device adopted in the ESPHome
+# dashboard imports it at the release tag. It holds no credentials and no
+# provisioning, so a remote import works without secrets.
+# =============================================================================
+
+packages:
+  base: !include ../../packages/base.yaml
+  hardware: !include ../../packages/hardware.yaml
+  voice_assistant: !include ../../packages/voice-assistant.yaml
+  leds: !include ../../packages/leds.yaml
+  timers_alarm: !include ../../packages/timers-alarm.yaml
