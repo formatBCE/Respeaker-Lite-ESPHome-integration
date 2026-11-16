@@ -11,14 +11,14 @@ substitutions:
   # Substitutions for audio files. The built-in sounds are Ogg Opus copies of
   # the Voice PE sounds in sounds/ (CC BY 4.0, see sounds/LICENSE.md), pinned
   # with the core by satellite_core_ref.
-  mute_switch_on_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/mute_switch_on.opus
-  mute_switch_off_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/mute_switch_off.opus
-  timer_finished_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/timer_finished.opus
-  wake_word_triggered_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/wake_word_triggered.opus
-  factory_reset_initiated_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/factory_reset_initiated.opus
-  factory_reset_cancelled_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/factory_reset_cancelled.opus
-  factory_reset_confirmed_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/factory_reset_confirmed.opus
-  error_cloud_expired_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/error_cloud_expired.opus
+  mute_switch_on_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/sounds/mute_switch_on.opus
+  mute_switch_off_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/sounds/mute_switch_off.opus
+  timer_finished_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/sounds/timer_finished.opus
+  wake_word_triggered_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/sounds/wake_word_triggered.opus
+  factory_reset_initiated_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/sounds/factory_reset_initiated.opus
+  factory_reset_cancelled_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/sounds/factory_reset_cancelled.opus
+  factory_reset_confirmed_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/sounds/factory_reset_confirmed.opus
+  error_cloud_expired_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/sounds/error_cloud_expired.opus
 
 api:
   actions:
@@ -76,7 +76,7 @@ micro_wake_word:
     - model: https://github.com/OHF-Voice/micro-wake-word/releases/download/okay_nabu_20241226.3/okay_nabu.json
       # probability_cutoff: 0.8
       id: okay_nabu
-    - model: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/microwakeword/models/v2/kenobi.json
+    - model: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/microwakeword/models/v2/kenobi.json
       id: kenobi
     - model: hey_jarvis
       id: hey_jarvis
@@ -87,7 +87,7 @@ micro_wake_word:
       internal: true
     # "Snooze": on only while a timer or the alarm rings, if "Snooze enabled" is
     # on (timers-alarm.yaml). Model trained by @dlarkinsPonderosa.
-    - model: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/microwakeword/models/v2/snooze.json
+    - model: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/microwakeword/models/v2/snooze.json
       id: snooze
       internal: true
   vad:

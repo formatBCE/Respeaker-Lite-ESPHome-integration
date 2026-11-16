@@ -15,19 +15,15 @@ substitutions:
   # Release of this repository. It selects the YAML packages below, the C++
   # components, and the DFU firmware. To update the device, set a newer
   # release. The README lists the releases and explains how to follow "main".
-  respeaker_ref: 2026.11.0
+  respeaker_lite_ref: 2026.11.0
 
 packages:
   respeaker:
-    url: https://github.com/formatBCE/Respeaker-XVF3800-ESPHome-integration
-    ref: ${respeaker_ref}
+    url: https://github.com/formatBCE/Respeaker-ESPHome-integration
+    ref: ${respeaker_lite_ref}
     refresh: 1d
     files:
-      - packages/base.yaml
-      - packages/hardware.yaml
-      - packages/voice-assistant.yaml
-      - packages/leds.yaml
-      - packages/timers-alarm.yaml
+      - config/common/respeaker-xvf-satellite-base.yaml
 
 # A remote package cannot read secrets, so the credentials go here.
 # ESPHome joins these blocks with the blocks in the packages.

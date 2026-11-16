@@ -24,14 +24,14 @@ packages:
 #   - platform: http_request
 #     name: Firmware Update
 #     update_interval: 30min
-#     source: https://formatbce.github.io/Koala-Satellite/manifest.json
+#     source: https://formatbce.github.io/Respeaker-ESPHome-integration/koala/manifest.json
 
 substitutions:
   # Release of this firmware. An adopted device imports the same release.
-  koala_ref: 2026.11.0
+  respeaker_lite_ref: 2026.11.0
 
 dashboard_import:
-  package_import_url: github://formatBCE/Koala-Satellite/config/common/koala-base.yaml@${koala_ref}
+  package_import_url: github://formatBCE/Respeaker-ESPHome-integration/config/common/koala-base.yaml@${respeaker_lite_ref}
   import_full_config: false
 
 wifi:

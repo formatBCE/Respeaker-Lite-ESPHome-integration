@@ -5,7 +5,7 @@
 # voice direction sensor, the wake word gain, and the volume range and volume
 # display of the media player.
 #
-# The core (Respeaker-Lite-ESPHome-integration packages/core/) holds the wake
+# The core (packages/core/) holds the wake
 # word detection, the voice pipeline, the media player, and the sounds. The
 # sound URLs are substitutions there. Override any of them to use your own files.
 # =============================================================================

@@ -18,10 +18,10 @@
 substitutions:
   # The button sounds. Only this package plays them, so a device without a
   # user button does not embed them. Override one to use your own sound.
-  center_button_press_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/center_button_press.opus
-  center_button_double_press_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/center_button_double_press.opus
-  center_button_triple_press_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/center_button_triple_press.opus
-  center_button_long_press_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-Lite-ESPHome-integration/${satellite_core_ref}/sounds/center_button_long_press.opus
+  center_button_press_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/sounds/center_button_press.opus
+  center_button_double_press_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/sounds/center_button_double_press.opus
+  center_button_triple_press_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/sounds/center_button_triple_press.opus
+  center_button_long_press_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/sounds/center_button_long_press.opus
 
 audio_file:
   - id: center_button_press_sound

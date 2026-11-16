@@ -199,7 +199,7 @@ respeaker_xvf3800:
           - lambda: id(factory_reset_phase) = 2;
           - script.execute: control_leds
   firmware:
-    url: https://github.com/formatBCE/Respeaker-XVF3800-ESPHome-integration/raw/${respeaker_ref}/respeaker_xvf3800_i2s_master_v1.0.9_48k.bin
+    url: https://github.com/formatBCE/Respeaker-ESPHome-integration/raw/${respeaker_lite_ref}/respeaker_xvf3800_i2s_master_v1.0.9_48k.bin
     version: "1.0.9"
     md5: b62766ccf8fbbaf924d0d13beace495b
     on_error:

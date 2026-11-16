@@ -4,10 +4,10 @@
 # The voice satellite core, node identity, ESP32-S3 build options, the I2C bus,
 # and the external components.
 #
-# The core comes from Respeaker-Lite-ESPHome-integration at respeaker_lite_ref:
+# config/common/respeaker-xvf-satellite-base.yaml includes the core first:
 # boot and connection logic, the voice pipeline, the media player, the timers,
-# the alarm, and the sounds. The packages of this repository add the XVF3800
-# hardware and extend the core items with "id: !extend <id>".
+# the alarm, and the sounds. The XVF3800 packages add the XVF3800 hardware and
+# extend the core items with "id: !extend <id>".
 #
 # This package declares the substitution defaults for the whole project.
 # Override any of them in your own configuration.
@@ -18,32 +18,13 @@ substitutions:
   name: respeaker-xvf3800-assistant
   friendly_name: reSpeaker XVF3800 Assistant
 
-  # --- Source refs ---------------------------------------------------------
-  # Release of this repository: a tag such as 2026.9.1, a branch, or a commit.
-  # It selects the C++ components and the DFU firmware. Each release sets it to
-  # its own tag, so a pinned package stays consistent. Set it to "main" to
-  # follow the newest code.
-  respeaker_ref: 2026.11.0
-  # Release of Respeaker-Lite-ESPHome-integration that holds the voice
-  # satellite core, the sounds, and the kenobi and snooze wake word models.
-  respeaker_lite_ref: 2026.10.4
+  # respeaker_lite_ref (the release of this repository) comes from
+  # packages/core/base.yaml.
 
   # --- Tuning --------------------------------------------------------------
   # The core sets hidden_ssid ("true" if your network does not broadcast its
   # SSID) and the voice assistant phase IDs.
   log_level: INFO
-
-packages:
-  # The core merges first, so a value in the packages of this repository wins.
-  satellite_core:
-    url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration
-    ref: ${respeaker_lite_ref}
-    refresh: 1d
-    files:
-      - packages/core/base.yaml
-      - packages/core/voice-assistant.yaml
-      - packages/core/media-player.yaml
-      - packages/core/timers-alarm.yaml
 
 esphome:
   name: ${name}
@@ -135,17 +116,11 @@ psram:
 external_components:
   - source:
       type: git
-      url: https://github.com/formatBCE/Respeaker-XVF3800-ESPHome-integration
-      ref: ${respeaker_ref}
+      url: https://github.com/formatBCE/Respeaker-ESPHome-integration
+      ref: ${respeaker_lite_ref}
     components:
       - respeaker_xvf3800
       - aic3104
-    refresh: 0s
-  # The decimator microphone, shared with the Respeaker Lite.
-  - source:
-      type: git
-      url: https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration
-      ref: ${respeaker_lite_ref}
-    components:
+      # The decimator microphone, shared with the Respeaker Lite.
       - decimator
     refresh: 0s

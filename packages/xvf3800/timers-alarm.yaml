@@ -1,7 +1,7 @@
 # =============================================================================
 # Respeaker XVF3800 satellite — timers and alarm package
 #
-# The core (Respeaker-Lite-ESPHome-integration packages/core/timers-alarm.yaml)
+# The core (packages/core/timers-alarm.yaml)
 # holds the timers, the alarm clock, the snooze, the time zone, and the clock
 # entities. This package adds the timer animation of the LED ring.
 #

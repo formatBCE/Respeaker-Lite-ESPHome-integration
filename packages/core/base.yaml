@@ -16,7 +16,7 @@
 # is empty until a device extends it with "- id: !extend <hook>":
 #   script      wake_word_start_hook             (after a wake word started the voice assistant)
 #
-# Koala Satellite and the Respeaker XVF3800 integration also use these packages.
+# The ReSpeaker Lite, Respeaker XVF3800, and Koala devices of this repository use these packages.
 # =============================================================================
 
 substitutions:
@@ -37,8 +37,13 @@ substitutions:
   voice_assist_error_phase_id: '11'
   # Change this to true in case you ahve a hidden SSID at home.
   hidden_ssid: "false"
-  # Ref of the repository that holds the core packages. The core lives in
-  # Respeaker-Lite-ESPHome-integration today, so it follows respeaker_lite_ref.
+  # Release of this repository: a tag such as 2026.9.1, a branch, or a commit.
+  # It selects the components, the wake word models, the sounds, and the XMOS
+  # firmware of every device. Each release sets it to its own tag, so a pinned
+  # package stays consistent. Set it to "main" to follow the newest code.
+  respeaker_lite_ref: 2026.11.0
+  # Ref of the core files (the sounds and the wake word models). It is the same
+  # as respeaker_lite_ref.
   satellite_core_ref: ${respeaker_lite_ref}
 
 esphome:

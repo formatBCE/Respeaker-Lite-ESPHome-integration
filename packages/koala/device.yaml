@@ -4,7 +4,7 @@
 # The Koala hardware on top of the ReSpeaker Lite board: the flash size, the
 # user button and dial pins, the LED ring with all its status effects, and the
 # onboard LEDs. The voice satellite core and the ReSpeaker Lite hardware come
-# from Respeaker-Lite-ESPHome-integration. config/common/koala-base.yaml joins
+# from packages/core/ and packages/respeaker-lite/. config/common/koala-base.yaml joins
 # them.
 # =============================================================================
 
@@ -340,7 +340,7 @@ light:
     rmt_symbols: 48
     # Explicit timings, as on the Respeaker Lite and the Voice PE. The ws2812
     # preset sends no reset, and newer LEDs drop a frame that follows the last
-    # one within 280 us (Respeaker-Lite-ESPHome-integration#88).
+    # one within 280 us (issue #88).
     bit0_high: 300ns
     bit0_low: 975ns
     bit1_high: 650ns
@@ -785,7 +785,7 @@ script:
       - delay: 500ms
       - lambda: id(color_changed) = false;
 
-  # Hooks for core/controls.yaml in Respeaker-Lite-ESPHome-integration
+  # Hooks for packages/core/controls.yaml
   - id: control_leds_status_off
     then:
       - light.turn_off: voice_assistant_leds

@@ -3,12 +3,12 @@
 
 substitutions:
   # Release of the Koala firmware. To update the device, set a newer release.
-  koala_ref: 2026.11.0
+  respeaker_lite_ref: 2026.11.0
 
 packages:
   koala:
-    url: https://github.com/formatBCE/Koala-Satellite
-    ref: ${koala_ref}
+    url: https://github.com/formatBCE/Respeaker-ESPHome-integration
+    ref: ${respeaker_lite_ref}
     refresh: 1d
     files:
       - config/common/koala-base.yaml

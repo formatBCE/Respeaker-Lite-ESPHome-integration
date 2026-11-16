@@ -12,7 +12,7 @@ substitutions:
   friendly_name: reSpeaker XVF3800
 
   # Release of this firmware. An adopted device imports the same release.
-  respeaker_ref: 2026.11.0
+  respeaker_lite_ref: 2026.11.0
 
 packages:
   respeaker_xvf: !include common/respeaker-xvf-satellite-base.yaml
@@ -33,7 +33,7 @@ esphome:
   name_add_mac_suffix: true
 
 dashboard_import:
-  package_import_url: github://formatBCE/Respeaker-XVF3800-ESPHome-integration/config/common/respeaker-xvf-satellite-base.yaml@${respeaker_ref}
+  package_import_url: github://formatBCE/Respeaker-ESPHome-integration/config/common/respeaker-xvf-satellite-base.yaml@${respeaker_lite_ref}
   import_full_config: false
 
 wifi:
@@ -59,7 +59,7 @@ ota:
 #   - platform: http_request
 #     name: Firmware Update
 #     update_interval: 30min
-#     source: https://formatbce.github.io/Respeaker-XVF3800-ESPHome-integration/manifest.json
+#     source: https://formatbce.github.io/Respeaker-ESPHome-integration/xvf3800/manifest.json
 
 improv_serial:
 
