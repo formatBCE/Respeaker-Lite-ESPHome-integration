@@ -3,7 +3,7 @@
 
 substitutions:
   # Release of the Koala firmware. To update the device, set a newer release.
-  respeaker_lite_ref: 2026.11.0
+  respeaker_lite_ref: 2026.11.1
 
 packages:
   koala:
