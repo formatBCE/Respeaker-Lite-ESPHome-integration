@@ -92,7 +92,7 @@ Create a file for your device. The packages give all the other configuration.
 substitutions:
   name: respeaker-xvf3800-assistant
   friendly_name: reSpeaker XVF3800 Assistant
-  respeaker_lite_ref: 2026.11.1
+  respeaker_lite_ref: 2026.11.2
 
 packages:
   respeaker:

@@ -28,7 +28,7 @@ packages:
 
 substitutions:
   # Release of this firmware. An adopted device imports the same release.
-  respeaker_lite_ref: 2026.11.1
+  respeaker_lite_ref: 2026.11.2
 
 dashboard_import:
   package_import_url: github://formatBCE/Respeaker-ESPHome-integration/config/common/koala-base.yaml@${respeaker_lite_ref}
