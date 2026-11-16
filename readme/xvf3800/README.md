@@ -92,19 +92,15 @@ Create a file for your device. The packages give all the other configuration.
 substitutions:
   name: respeaker-xvf3800-assistant
   friendly_name: reSpeaker XVF3800 Assistant
-  respeaker_ref: 2026.11.0
+  respeaker_lite_ref: 2026.11.0
 
 packages:
   respeaker:
-    url: https://github.com/formatBCE/Respeaker-XVF3800-ESPHome-integration
-    ref: ${respeaker_ref}
+    url: https://github.com/formatBCE/Respeaker-ESPHome-integration
+    ref: ${respeaker_lite_ref}
     refresh: 1d
     files:
-      - packages/base.yaml
-      - packages/hardware.yaml
-      - packages/voice-assistant.yaml
-      - packages/leds.yaml
-      - packages/timers-alarm.yaml
+      - config/common/respeaker-xvf-satellite-base.yaml
 
 # A remote package cannot read secrets, so the credentials go here.
 # ESPHome joins these blocks with the blocks in the packages.
@@ -146,7 +142,7 @@ Use the web installer if you do not want to build the firmware. The firmware has
 no credentials. The device gets the Wi-Fi credentials through Improv over USB
 serial or over BLE.
 
-1. Open the [web installer](https://formatbce.github.io/Respeaker-XVF3800-ESPHome-integration/)
+1. Open the [web installer](https://formatbce.github.io/Respeaker-ESPHome-integration/xvf3800/)
    in Chrome or Edge on a computer.
 2. Connect the computer to the USB-C port of the XIAO ESP32-S3 board.
 3. Click **Connect**, and select the board.
@@ -183,8 +179,7 @@ substitution in a package.
 | --- | --- | --- |
 | `name` | `respeaker-xvf3800-assistant` | ESPHome node name |
 | `friendly_name` | `reSpeaker XVF3800 Assistant` | Display name |
-| `respeaker_ref` | the current release, for example `2026.9.1` | Release for the packages, the components, and the firmware |
-| `respeaker_lite_ref` | a Respeaker Lite release, set by each release | Release of the voice satellite core. Read [Package layout](#package-layout) |
+| `respeaker_lite_ref` | the current release, for example `2026.9.1` | Release for the packages, the core, the components, and the firmware |
 | `hidden_ssid` | `"false"` | Set this to `"true"` for a hidden network |
 | `log_level` | `INFO` | Logger level |
 | `voice_assist_*_phase_id` | `1` to `11` | Phase constants for the LED ring |
@@ -291,52 +286,68 @@ credentials.
 ## Releases and updates
 
 Each release has a tag, for example `2026.9.1`. The
-[tags page](https://github.com/formatBCE/Respeaker-XVF3800-ESPHome-integration/tags)
-shows all releases. The `respeaker_ref` substitution in your configuration
-selects the release.
+[tags page](https://github.com/formatBCE/Respeaker-ESPHome-integration/tags)
+shows all releases. The `respeaker_lite_ref` substitution in your configuration
+selects the release. The Respeaker Lite and Koala Satellite devices use the same
+releases.
 
-One substitution controls three things: the YAML packages, the C++ components,
-and the DSP firmware. So the YAML and the firmware always match. Use
-`${respeaker_ref}` also as the `ref:` of the `packages:` block. If you pin only
-the `packages:` block, ESPHome takes the YAML from your tag but the C++ from
-another ref. That mismatch is difficult to find.
-
-Each release also sets `respeaker_lite_ref` to a release of the
-[Respeaker Lite integration](https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration).
-That release supplies the voice satellite core. Keep the default value. The
-release workflow checks that the two releases work together.
+One substitution controls four things: the YAML packages, the voice satellite
+core, the C++ components, and the DSP firmware. So the YAML and the firmware
+always match. Use `${respeaker_lite_ref}` also as the `ref:` of the `packages:`
+block. If you pin only the `packages:` block, ESPHome takes the YAML from your
+tag but the C++ from another ref. That mismatch is difficult to find.
 
 To update the device:
-1. Set `respeaker_ref` to the tag of the new release.
+1. Set `respeaker_lite_ref` to the tag of the new release.
 2. Install the configuration on the device again.
 
 Use `main` only to test new code. A change in `main` can break the build or the
-device. To get the newest code before a release, set `respeaker_ref` to `main`.
+device. To get the newest code before a release, set `respeaker_lite_ref` to `main`.
 
 **Note:** `esp32.framework.version` is `recommended`, so a new ESPHome release
-can still change the ESP-IDF version. A pinned `respeaker_ref` does not give a
+can still change the ESP-IDF version. A pinned `respeaker_lite_ref` does not give a
 fully reproducible build.
+
+### Move from the old repository
+
+This firmware was in the `Respeaker-XVF3800-ESPHome-integration` repository
+before. A configuration that uses that repository continues to build its old
+release, but it gets no new releases. To get new releases, change your
+configuration:
+
+1. Replace the `respeaker_ref` substitution with `respeaker_lite_ref`. Set it to
+   a release of this repository.
+2. In the `packages:` block, set `url` to this repository and `ref` to
+   `${respeaker_lite_ref}`.
+3. Replace the five package files with `config/common/respeaker-xvf-satellite-base.yaml`.
+
+The example in [Make the device configuration](#2-make-the-device-configuration)
+shows the result. A device that you installed with the web installer moves to
+this repository with its next update.
 
 ---
 
 ## Package layout
 
-The voice satellite core comes from the `packages/core/` directory of the
-[Respeaker Lite integration](https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration)
-at `respeaker_lite_ref`. The core holds the boot and connection logic, the
-wake word, the voice pipeline, the media player, the timers, the alarm, and the
-sounds. Koala Satellite and the Respeaker Lite use the same core. The
-`base.yaml` package includes the core, so your configuration does not change.
+The voice satellite core is in the [packages/core](/packages/core) directory.
+The core holds the boot and connection logic, the wake word, the voice pipeline,
+the media player, the timers, the alarm, and the sounds. Koala Satellite and the
+Respeaker Lite use the same core.
+
+`config/common/respeaker-xvf-satellite-base.yaml` includes the core first, then
+the XVF3800 packages in [packages/xvf3800](/packages/xvf3800). The core does not
+include `controls.yaml`, because the XMOS chip owns the buttons.
 
 | Package | Contents |
 | --- | --- |
-| `base.yaml` | The voice satellite core, `esphome`, `esp32`, `psram`, the logger level, the Wi-Fi tuning, the `set_led_color` action, `i2c`, `external_components` |
+| `base.yaml` | `esphome`, `esp32`, `psram`, the logger level, the Wi-Fi tuning, the `set_led_color` action, `i2c`, `external_components` |
 | `hardware.yaml` | `i2s_audio`, `microphone`, `speaker`, `audio_dac`, `respeaker_xvf3800` with the DFU firmware |
 | `voice-assistant.yaml` | The beam lock, the voice direction sensor, the wake word gain, the volume range and the volume display of the media player |
 | `leds.yaml` | LED globals, the animation interval, the effect scripts, the colour preset |
 | `timers-alarm.yaml` | The timer animation of the LED ring |
 
-**Caution:** Include all five packages. They are separate files for maintenance,
+**Caution:** Include all five packages and the core. The common file does this for
+you. The packages are separate files for maintenance,
 but they are not independent. The `leds.yaml` package reads entities from the
 core and from `hardware.yaml`. The `control_leds` script runs from `wifi`,
 `api`, `on_boot`, and 12 voice assistant triggers. If you remove one file, the
@@ -408,8 +419,8 @@ If `dfu-util -l` does not find the board, start the DSP in Safe Mode:
 To change the firmware version, change three things together:
 
 1. The `.bin` file in the repository root.
-2. The `version` value in `packages/hardware.yaml`.
-3. The `md5` value in `packages/hardware.yaml`.
+2. The `version` value in `packages/xvf3800/hardware.yaml`.
+3. The `md5` value in `packages/xvf3800/hardware.yaml`.
 
 The build fails if the MD5 sum does not agree with the file.
 
@@ -509,7 +520,7 @@ word can start late, or stop early, when the audio plays on an external speaker.
 The ring has 12 RGB LEDs. The DSP controls them over I2C. The driver writes the
 ring as one 12-entry array.
 
-All animation is in YAML, in `packages/leds.yaml`:
+All animation is in YAML, in `packages/xvf3800/leds.yaml`:
 
 1. A 50 ms interval reads the `current_led_effect` global.
 2. The interval calls one `update_*_effect` script.
@@ -588,43 +599,27 @@ The packages get the C++ components from GitHub, so a new checkout builds the
 **published** code and not your working tree.
 
 To build your local changes, change the `external_components` block in
-`packages/base.yaml`:
+`packages/xvf3800/base.yaml`:
 
 ```yaml
 external_components:
   - source:
       type: local
       path: esphome/components
-    components: [respeaker_xvf3800, aic3104]
+    components: [respeaker_xvf3800, aic3104, decimator]
 ```
 
 Do not commit this change.
 
-To test a change to the packages, include them from disk:
+To test a change to the packages or the core, include
+`config/common/respeaker-xvf-satellite-base.yaml` from disk. It includes the
+core and the XVF3800 packages with relative paths, so all of them come from
+your working tree:
 
 ```yaml
 packages:
-  base: !include ../packages/base.yaml
-  hardware: !include ../packages/hardware.yaml
-  voice_assistant: !include ../packages/voice-assistant.yaml
-  leds: !include ../packages/leds.yaml
-  timers_alarm: !include ../packages/timers-alarm.yaml
+  respeaker_xvf: !include ../config/common/respeaker-xvf-satellite-base.yaml
 ```
-
-The `base.yaml` package still gets the core from GitHub at
-`respeaker_lite_ref`. To test a change to the core, clone the Respeaker Lite
-repository next to this repository. Then replace the `satellite_core` package
-in `packages/base.yaml` with local includes:
-
-```yaml
-packages:
-  core_base: !include ../../Respeaker-Lite-ESPHome-integration/packages/core/base.yaml
-  core_voice_assistant: !include ../../Respeaker-Lite-ESPHome-integration/packages/core/voice-assistant.yaml
-  core_media_player: !include ../../Respeaker-Lite-ESPHome-integration/packages/core/media-player.yaml
-  core_timers_alarm: !include ../../Respeaker-Lite-ESPHome-integration/packages/core/timers-alarm.yaml
-```
-
-Do not commit this change.
 
 Useful commands:
 
@@ -682,11 +677,10 @@ connection to Home Assistant, because the LED state follows the API state.
 - The XMOS control protocol follows Respeaker's `xvf_host.py`.
 - [dlarkinsPonderosa](https://github.com/dlarkinsPonderosa) trained the "Snooze"
   wake word model and designed the snooze feature
-  ([#59](https://github.com/formatBCE/Respeaker-XVF3800-ESPHome-integration/issues/59),
+  (XVF3800 repository [#59](https://github.com/formatBCE/Respeaker-XVF3800-ESPHome-integration/issues/59),
   [#60](https://github.com/formatBCE/Respeaker-XVF3800-ESPHome-integration/pull/60)).
 - The notification sounds come from the
   [Home Assistant Voice PE](https://github.com/esphome/home-assistant-voice-pe) project.
   The sounds are © 2024 by Clayton Charles Tapp, under CC BY 4.0. The `sounds/`
-  directory of the Respeaker Lite integration holds copies in Ogg Opus format.
-  Read [its sounds/LICENSE.md](https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/blob/main/sounds/LICENSE.md)
-  for the changes.
+  directory holds copies in Ogg Opus format.
+  Read [sounds/LICENSE.md](/sounds/LICENSE.md) for the changes.

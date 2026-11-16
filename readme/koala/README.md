@@ -2,13 +2,13 @@
 
 # Koala Satellite
 <div style="display: flex; justify-content: space-between;">
-  <img src="/casing/images/assembled.png" width="400">
-  <img src="/instructions/images/live_view_old.jpg" width="400">
+  <img src="/casing/koala/images/assembled.png" width="400">
+  <img src="/readme/koala/images/live_view_old.jpg" width="400">
 </div>
 
 ### Koala Satellite is a DIY device that works as a satellite for Home Assistant Assist.
 
-### *For pre-built factory firmware flashing check [online flashing tool](https://formatbce.github.io/Koala-Satellite/)*
+### *For pre-built factory firmware flashing check [online flashing tool](https://formatbce.github.io/Respeaker-ESPHome-integration/koala/)*
 
 #### Main characteristics:
 - two far-field microphones, coupled with XMOS chip XU-316 for noise cancelation and voice recognition;
@@ -30,9 +30,9 @@ They connect to Home Assistant in the same way and have identical possibilities.
 Koala is just something you can assemble yourself from widely accessible parts.
 Also it has pretty decent for size audio speaker and doesn't have external sensors connectors.
 
-#### How is it different from [this repository](https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration)?
+#### How is it different from [the Respeaker Lite device](/readme/lite/README.md)?
 I started to work with [Respeaker Lite](https://www.seeedstudio.com/ReSpeaker-Lite-p-5928.html) in the Fall of 2024. 
-That repository was my attempt to put everything i know together.
+That project was my attempt to put everything i know together.
 All the process is pretty much documented in [this Home Assistant Community thread](https://community.home-assistant.io/t/respeaker-lite-new-seeed-studio-voice-assistant-development-kit-hardware-combine-esp32-with-xmos-xu316-dsp-chip-for-advanced-audio-processing-as-a-esphome-based-home-assistant-assist-satellite-voice-devkit).
 At some point i made Echo-Pop-like enclosure to the Respeaker Lite Kit. But it had disadvantages, like gluing face plate (or fabric), no access to ESP and Respeaker USB ports, lack of volume controls and rudimentary LED.
 So i started thinking on real device. Here it is.
@@ -43,9 +43,9 @@ Also, current configuration hides nicely USB power cable (which is also ESP32 da
 If you're using pre-soldered version, you may check [this PR by @rananna](https://github.com/formatBCE/Koala-Satellite/pull/5) _(Thank you!)_.
 Or even go full bananas and use it without dedicated LED strip (top LED should work okay) - just adjust LED diffuser color to your like.
 
-### [Here's how you make one for yourself.](/instructions/assembly.md)
+### [Here's how you make one for yourself.](/readme/koala/assembly.md)
 
-### Check main abilities [here on Respeaker repository](https://github.com/formatBCE/Respeaker-Lite-ESPHome-integration/tree/main?tab=readme-ov-file#current-abilities) - they're identical
+### Check main abilities [on the Respeaker Lite page](/readme/lite/README.md#current-abilities) - they're identical
 
 ### What if i don't want or cannot build it myself?
 Create issue in this repository to let me know, that you need fully assembled device (or just printed enclosure for it). I will consider selling if demand is there. :)
