@@ -55,7 +55,7 @@ The **LED Ring** light controls the 12-LED ring. Read
 
 ## Requirements
 
-- ESPHome **2026.10.0** or later.
+- ESPHome **2026.11.0** or later.
 - Home Assistant with the ESPHome integration.
 - A reSpeaker XVF3800 USB 4-Mic Array board.
 - A USB-C cable and a computer that can flash the board.
@@ -92,7 +92,7 @@ Create a file for your device. The packages give all the other configuration.
 substitutions:
   name: respeaker-xvf3800-assistant
   friendly_name: reSpeaker XVF3800 Assistant
-  respeaker_lite_ref: 2026.11.1
+  respeaker_lite_ref: 2026.11.2
 
 packages:
   respeaker:

@@ -33,7 +33,7 @@ env:
   # manifest.json there, so never change a device's path.
   SITE_URL: https://formatbce.github.io/Respeaker-ESPHome-integration
   # Build tools. Raise them on purpose, so that a release is reproducible.
-  ESPHOME_VERSION: "2026.10.0"
+  ESPHOME_VERSION: "2026.11.0"
   EWT_GEN_VERSION: "1.6.1"
 
 jobs:

@@ -25,7 +25,7 @@ class DecimatorMicrophone : public Component, public microphone::Microphone {
 
  protected:
   /// Source microphone task only.
-  void process_audio_(const std::vector<uint8_t> &data);
+  void process_audio_(const microphone::AudioCapture &capture);
 
   microphone::MicrophoneSource *source_;
   // Reused for every chunk so decimation does not allocate after the first chunks

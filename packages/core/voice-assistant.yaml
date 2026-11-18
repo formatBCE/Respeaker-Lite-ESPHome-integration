@@ -20,6 +20,18 @@ substitutions:
   factory_reset_confirmed_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/sounds/factory_reset_confirmed.opus
   error_cloud_expired_sound_file: https://raw.githubusercontent.com/formatBCE/Respeaker-ESPHome-integration/${satellite_core_ref}/sounds/error_cloud_expired.opus
 
+external_components:
+  # Wake word audio (esphome/esphome#21885) is not in ESPHome 2026.11. Remove
+  # this block when the ESPHome release that includes it is the min_version.
+  - source:
+      type: git
+      url: https://github.com/esphome/esphome
+      ref: 92723c905c72b39a60a56bfc3f110284f0a72e6c
+    components:
+      - api
+      - micro_wake_word
+      - voice_assistant
+
 api:
   actions:
     - action: start_va
@@ -145,15 +157,24 @@ micro_wake_word:
                                 id: external_media_player
                           # Start the voice assistant and play the wake sound, if enabled
                           else:
+                            # Home Assistant verifies the wake word: light the LEDs now and play
+                            # no sound, so the command can follow the wake word.
                             - if:
                                 condition:
-                                  switch.is_on: wake_sound
+                                  lambda: return id(va).is_wake_word_audio_active();
                                 then:
-                                  - script.execute:
-                                      id: play_sound
-                                      priority: true
-                                      sound_file: "wake_word_triggered_sound"
-                                  - delay: 300ms
+                                  - lambda: id(voice_assistant_phase) = ${voice_assist_waiting_for_command_phase_id};
+                                  - script.execute: control_leds
+                                else:
+                                  - if:
+                                      condition:
+                                        switch.is_on: wake_sound
+                                      then:
+                                        - script.execute:
+                                            id: play_sound
+                                            priority: true
+                                            sound_file: "wake_word_triggered_sound"
+                                        - delay: 300ms
                             - voice_assistant.start:
                                 wake_word: !lambda return wake_word;
                             # Device hook, empty here. See the script below.
@@ -176,24 +197,9 @@ select:
       - Moderately sensitive
       - Very sensitive
     on_value:
-      # Sets specific wake word probabilities computed for each particular model
-      # Note probability cutoffs are set as a quantized uint8 value, each comment has the corresponding floating point cutoff
-      # False Accepts per Hour values are tested against all units and channels from the Dinner Party Corpus.
-      # These cutoffs apply only to the specific models included in the firmware: okay_nabu@20241226.3, hey_jarvis@v2, hey_mycroft@v2
-      lambda: |-
-        if (x == "Slightly sensitive") {
-          id(okay_nabu).set_probability_cutoff(217);    // 0.85 -> 0.000 FAPH on DipCo (Manifest's default)
-          id(hey_jarvis).set_probability_cutoff(247);   // 0.97 -> 0.563 FAPH on DipCo (Manifest's default)
-          id(hey_mycroft).set_probability_cutoff(253);  // 0.99 -> 0.567 FAPH on DipCo
-        } else if (x == "Moderately sensitive") {
-          id(okay_nabu).set_probability_cutoff(176);    // 0.69 -> 0.376 FAPH on DipCo
-          id(hey_jarvis).set_probability_cutoff(235);   // 0.92 -> 0.939 FAPH on DipCo
-          id(hey_mycroft).set_probability_cutoff(242);  // 0.95 -> 1.502 FAPH on DipCo (Manifest's default)
-        } else if (x == "Very sensitive") {
-          id(okay_nabu).set_probability_cutoff(143);    // 0.56 -> 0.751 FAPH on DipCo
-          id(hey_jarvis).set_probability_cutoff(212);   // 0.83 -> 1.502 FAPH on DipCo
-          id(hey_mycroft).set_probability_cutoff(237);  // 0.93 -> 1.878 FAPH on DipCo
-        }
+      - script.execute:
+          id: apply_wake_word_sensitivity
+          ringing: !lambda return id(timer_ringing).state;
 
 voice_assistant:
   id: va
@@ -202,6 +208,11 @@ voice_assistant:
     channels: 0
   media_player: external_media_player
   micro_wake_word: mww
+  # Used only when Home Assistant asks for it: microWakeWord then proposes
+  # detections at lower cutoffs and Home Assistant verifies them.
+  wake_word_audio:
+    buffer_duration: 1500ms
+    timeout: 2s
   use_wake_word: false
   noise_suppression_level: 0
   auto_gain: 0 dbfs
@@ -214,6 +225,10 @@ voice_assistant:
         then:
           - switch.turn_off: mic_mute_switch
     - lambda: id(init_in_progress) = false;
+    # Home Assistant tells on each connection if it verifies the wake word.
+    - script.execute:
+        id: apply_wake_word_sensitivity
+        ringing: !lambda return id(timer_ringing).state;
     - micro_wake_word.start:
     - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
     - script.execute: control_leds
@@ -242,12 +257,36 @@ voice_assistant:
               id: play_sound
               priority: true
               sound_file: "error_cloud_expired"
-  # When the voice assistant starts: Play a wake up sound, duck audio.
+    - if:
+        condition:
+          - lambda: return code == "wake-word-verification-timeout";
+        then:
+          - delay: 1s
+          - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+          - script.execute: control_leds
+  # When the voice assistant starts: duck audio. A wake word that Home Assistant
+  # verifies ducks audio only once it is accepted.
   on_start:
-    - mixer_speaker.apply_ducking:
-        id: media_mixing_input
-        decibel_reduction: 20  # Number of dB quieter; higher implies more quiet, 0 implies full volume
-        duration: 0.0s  # The duration of the transition (default is no transition)
+    - if:
+        condition:
+          lambda: return !id(va).is_wake_word_audio_active();
+        then:
+          - mixer_speaker.apply_ducking:
+              id: media_mixing_input
+              decibel_reduction: 20  # Number of dB quieter; higher implies more quiet, 0 implies full volume
+              duration: 0.0s  # The duration of the transition (default is no transition)
+  on_wake_word_detected:
+    - if:
+        condition:
+          lambda: return id(va).is_wake_word_audio_active();
+        then:
+          - mixer_speaker.apply_ducking:
+              id: media_mixing_input
+              decibel_reduction: 20
+              duration: 0.0s
+  on_wake_word_rejected:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+    - script.execute: control_leds
   on_listening:
     - lambda: id(voice_assistant_phase) = ${voice_assist_waiting_for_command_phase_id};
     - script.execute: control_leds
@@ -330,6 +369,44 @@ script:
   # The XVF3800 locks its beam to the speaker direction.
   - id: wake_word_start_hook
     then: []
+
+  # Sets the wake word cutoffs. When Home Assistant verifies the wake word,
+  # microWakeWord only proposes detections, so the cutoffs are lower. A ringing
+  # timer stops on any wake word without verification, so it keeps the normal
+  # cutoffs. "ringing" is a parameter, because the triggers of the timer_ringing
+  # switch run before the switch publishes its new state.
+  - id: apply_wake_word_sensitivity
+    parameters:
+      ringing: bool
+    then:
+      # Note probability cutoffs are set as a quantized uint8 value, each comment has the corresponding floating point cutoff
+      # False Accepts per Hour values are tested against all units and channels from the Dinner Party Corpus.
+      # These cutoffs apply only to the specific models included in the firmware: okay_nabu@20241226.3, hey_jarvis@v2, hey_mycroft@v2
+      - lambda: |-
+          const StringRef sensitivity = id(wake_word_sensitivity).current_option();
+          if (id(va).is_wake_word_audio_active() && !ringing) {
+            uint8_t cutoff = 102;                         // 0.40
+            if (sensitivity == "Slightly sensitive") {
+              cutoff = 128;                               // 0.50
+            } else if (sensitivity == "Very sensitive") {
+              cutoff = 77;                                // 0.30
+            }
+            id(okay_nabu).set_probability_cutoff(cutoff);
+            id(hey_jarvis).set_probability_cutoff(cutoff);
+            id(hey_mycroft).set_probability_cutoff(cutoff);
+          } else if (sensitivity == "Slightly sensitive") {
+            id(okay_nabu).set_probability_cutoff(217);    // 0.85 -> 0.000 FAPH on DipCo (Manifest's default)
+            id(hey_jarvis).set_probability_cutoff(247);   // 0.97 -> 0.563 FAPH on DipCo (Manifest's default)
+            id(hey_mycroft).set_probability_cutoff(253);  // 0.99 -> 0.567 FAPH on DipCo
+          } else if (sensitivity == "Moderately sensitive") {
+            id(okay_nabu).set_probability_cutoff(176);    // 0.69 -> 0.376 FAPH on DipCo
+            id(hey_jarvis).set_probability_cutoff(235);   // 0.92 -> 0.939 FAPH on DipCo
+            id(hey_mycroft).set_probability_cutoff(242);  // 0.95 -> 1.502 FAPH on DipCo (Manifest's default)
+          } else if (sensitivity == "Very sensitive") {
+            id(okay_nabu).set_probability_cutoff(143);    // 0.56 -> 0.751 FAPH on DipCo
+            id(hey_jarvis).set_probability_cutoff(212);   // 0.83 -> 1.502 FAPH on DipCo
+            id(hey_mycroft).set_probability_cutoff(237);  // 0.93 -> 1.878 FAPH on DipCo
+          }
 
   # Script executed when we want to play sounds on the device.
   - id: play_sound
