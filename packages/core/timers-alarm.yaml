@@ -100,6 +100,9 @@ switch:
       - micro_wake_word.disable_model: stop
       - micro_wake_word.disable_model: snooze
       - script.execute: disable_repeat
+      - script.execute:
+          id: apply_wake_word_sensitivity
+          ringing: false
       # Stop any current announcement (ie: stop the timer ring mid playback)
       - if:
           condition:
@@ -117,6 +120,10 @@ switch:
       # Refresh the LED ring
       - script.execute: control_leds
     on_turn_on:
+      # Any wake word stops the ring without verification: use the normal cutoffs
+      - script.execute:
+          id: apply_wake_word_sensitivity
+          ringing: true
       # Duck audio
       - mixer_speaker.apply_ducking:
           id: media_mixing_input
