@@ -33,6 +33,11 @@ esphome:
 
 esp32:
   flash_size: 16MB
+  framework:
+    advanced:
+      # Link only the generic flash driver to save IRAM. ESP-IDF falls back to
+      # it for any vendor, so a DevKitC clone with other flash still boots.
+      flash_chip: generic
 
 ota:
   - platform: esphome

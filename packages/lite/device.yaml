@@ -12,6 +12,11 @@ esphome:
 
 esp32:
   flash_size: 8MB
+  framework:
+    advanced:
+      # The XIAO ESP32-S3 has GigaDevice flash. Link only that driver to save
+      # IRAM; another vendor falls back to the generic driver.
+      flash_chip: gd
 
 binary_sensor:
   # User Button. Used for many things (See on_multi_click)

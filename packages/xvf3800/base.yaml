@@ -57,6 +57,10 @@ esp32:
 
       CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
       CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"  # TLS1.3 support isn't enabled by default in IDF 5.1.5
+    advanced:
+      # The XIAO ESP32-S3 has GigaDevice flash. Link only that driver to save
+      # IRAM; another vendor falls back to the generic driver.
+      flash_chip: gd
 
 
 # Credentials are not set here. A remote package cannot read secrets.
