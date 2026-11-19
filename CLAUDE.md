@@ -19,8 +19,8 @@ package.
 The XVF3800 and Koala firmware came from the repositories `Respeaker-XVF3800-ESPHome-integration` and `Koala-Satellite`.
 Those repositories are frozen. Their old tags still serve old user configurations.
 
-There is no test suite and no linter configuration. The only CI workflow is `.github/workflows/release.yaml`, which builds
-and publishes releases.
+There is no test suite and no linter configuration. The CI workflows are `.github/workflows/prepare-release.yaml`, which
+opens the release pull request, and `.github/workflows/release.yaml`, which builds and publishes releases.
 
 ## Commands
 
@@ -277,16 +277,23 @@ the ESP misbehaves.
 - ESPHome 2026.11 does not include wake word audio (esphome/esphome#21885). So `core/voice-assistant.yaml` gets `api`,
   `micro_wake_word` and `voice_assistant` from the ESPHome commit that merged it, the same as Voice PE. Remove that
   `external_components` block when `min_version` becomes the first ESPHome release that includes the PR.
-- Releases use plain CalVer tags without a `v`, for example `2026.9.1`. One tag serves all devices. To prepare a
-  release, set the new version in ten places:
+- Releases use plain CalVer tags without a `v`, for example `2026.9.1`. One tag serves all devices. The new version goes
+  in eleven places:
   - the `respeaker_lite_ref` default in `packages/core/base.yaml`;
   - `esphome.project.version` in `packages/lite/device.yaml`, `packages/xvf3800/base.yaml`, `packages/koala/device.yaml`;
-  - `respeaker_lite_ref` in the three user examples and the three factory configs in `config/`.
+  - `respeaker_lite_ref` in the three user examples and the three factory configs in `config/`;
+  - `respeaker_lite_ref` in the example of `readme/xvf3800/README.md`.
 
-  The default must equal the tag, because a pinned package then gets the components, the models, and the firmware from
-  the same release.
-- Push that commit to `main`. `.github/workflows/release.yaml` then runs: `prepare` reads the **first** `version:` line of
-  `packages/lite/device.yaml`, checks that the tag does not exist and that all ten places equal the version; `build` is a
+  `.github/scripts/release-version.sh` holds that list. `check <version>` fails if a place holds another value.
+  `bump <version>` sets the version, then checks. Add a new place to the list, not to a workflow. The default must equal
+  the tag, because a pinned package then gets the components, the models, and the firmware from the same release.
+- To prepare a release, run `.github/workflows/prepare-release.yaml` (Actions > Prepare release > Run workflow). An empty
+  `version` input gives the next version: the patch after the latest tag in the same month, else `<year>.<month>.0`. The
+  workflow checks the version, runs `bump` on a `release/<version>` branch from `main`, and opens a draft pull request
+  with the changes since the latest tag. It needs "Allow GitHub Actions to create and approve pull requests" in the
+  repository settings. Merge that pull request to publish.
+- The merge to `main` starts `.github/workflows/release.yaml`: `prepare` reads the **first** `version:` line of
+  `packages/lite/device.yaml`, checks that the tag does not exist and runs `release-version.sh check`; `build` is a
   matrix over `lite`, `xvf3800`, `koala`, installs the pinned `ESPHOME_VERSION`, points the factory config's
   `respeaker_lite_ref` at the commit SHA (the tag does not exist yet), runs the pinned `ewt-gen` with
   `--publish-url https://formatbce.github.io/Respeaker-ESPHome-integration/<device>`, and checks that the generated

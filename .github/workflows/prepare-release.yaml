@@ -1,0 +1,104 @@
+name: Prepare release
+
+# Sets the next version in every file that pins it, on a release/<version>
+# branch from main, and opens a draft pull request. Merging that pull request
+# runs release.yaml, which publishes the version.
+#
+# Needs "Allow GitHub Actions to create and approve pull requests" in
+# Settings > Actions > General.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version, for example 2026.11.3. Empty: the next one after the latest tag"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          # All tags and history: the version and the change list need them.
+          fetch-depth: 0
+
+      - name: Choose the version
+        id: version
+        env:
+          INPUT: ${{ inputs.version }}
+        run: |
+          LAST=$(git tag --list '[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          test -n "$LAST" || { echo "::error::No release tag found."; exit 1; }
+          MONTH=$(date -u +%Y.%-m)
+          if [ -n "$INPUT" ]; then
+            V=$INPUT
+          elif [ "${LAST%.*}" = "$MONTH" ]; then
+            V="$MONTH.$(( ${LAST##*.} + 1 ))"
+          else
+            V="$MONTH.0"
+          fi
+
+          echo "$V" | grep -qE '^[0-9]{4}\.([1-9]|1[0-2])\.(0|[1-9][0-9]*)$' \
+            || { echo "::error::'$V' is not a version like 2026.11.3."; exit 1; }
+          if git rev-parse -q --verify "refs/tags/$V" > /dev/null; then
+            echo "::error::Release $V exists."; exit 1
+          fi
+          if [ "$(printf '%s\n' "$LAST" "$V" | sort -V | tail -n1)" != "$V" ]; then
+            echo "::error::$V is older than the latest release $LAST."; exit 1
+          fi
+          if [ "$(git rev-list --count "$LAST..HEAD")" -eq 0 ]; then
+            echo "::error::main has no change since $LAST."; exit 1
+          fi
+          if git ls-remote --exit-code --heads origin "release/$V" > /dev/null; then
+            echo "::error::Branch release/$V exists. Delete it or merge its pull request."; exit 1
+          fi
+
+          echo "Release $V after $LAST."
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "last=$LAST" >> "$GITHUB_OUTPUT"
+
+      - name: Set the version
+        env:
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          bash .github/scripts/release-version.sh bump "$V"
+          if git diff --quiet; then
+            echo "::error::main already holds $V. Run release.yaml by hand to publish it."; exit 1
+          fi
+          git diff --stat
+
+      - name: Open the draft pull request
+        env:
+          V: ${{ steps.version.outputs.version }}
+          LAST: ${{ steps.version.outputs.last }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "release/$V"
+          git commit -qam "Release $V"
+          git push -q origin "release/$V"
+
+          {
+            echo "Sets the version $V in every file that pins it."
+            echo
+            echo "Merge to publish. \`release.yaml\` then builds all devices, deploys GitHub Pages, and creates the tag and the release."
+            echo
+            echo "## Changes since $LAST"
+            echo
+            git log --no-merges --format='- %s (%h)' "$LAST..origin/main"
+          } > "$RUNNER_TEMP/body.md"
+
+          gh pr create --draft --base main --head "release/$V" \
+            --title "Release $V" --body-file "$RUNNER_TEMP/body.md"

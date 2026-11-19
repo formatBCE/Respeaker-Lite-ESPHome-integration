@@ -66,27 +66,9 @@ jobs:
 
       - name: Check that the release is consistent
         if: steps.version.outputs.release == 'true'
-        run: |
-          V='${{ steps.version.outputs.version }}'
-          fail=0
-          # check <key> <file>: the first "<key>:" line of <file> must hold the version.
-          check() {
-            value=$(grep -E "^[[:space:]]*$1:" "$2" | head -n1 | sed -E "s/.*$1:[[:space:]]*\"?([^\"]+)\"?[[:space:]]*\$/\\1/")
-            if [ "$value" != "$V" ]; then
-              echo "::error file=$2::$1 is '$value'. Set it to $V."
-              fail=1
-            fi
-          }
-          check respeaker_lite_ref packages/core/base.yaml
-          for f in packages/lite/device.yaml packages/xvf3800/base.yaml packages/koala/device.yaml; do
-            check version "$f"
-          done
-          for f in config/respeaker-satellite-dashboard-example.yaml config/respeaker-xvf-satellite-example.yaml \
-                   config/koala-dashboard.yaml config/respeaker-satellite-factory.yaml \
-                   config/respeaker-xvf-satellite-factory.yaml config/koala-satellite.yaml; do
-            check respeaker_lite_ref "$f"
-          done
-          exit $fail
+        env:
+          V: ${{ steps.version.outputs.version }}
+        run: bash .github/scripts/release-version.sh check "$V"
 
   build:
     needs: prepare
