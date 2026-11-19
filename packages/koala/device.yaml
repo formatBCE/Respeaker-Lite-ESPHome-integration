@@ -29,7 +29,7 @@ esphome:
   name_add_mac_suffix: true
   project: 
     name: formatbce.Koala Satellite
-    version: 2026.11.2
+    version: 2026.11.3
 
 esp32:
   flash_size: 16MB

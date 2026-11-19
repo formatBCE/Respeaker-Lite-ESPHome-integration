@@ -41,7 +41,7 @@ substitutions:
   # It selects the components, the wake word models, the sounds, and the XMOS
   # firmware of every device. Each release sets it to its own tag, so a pinned
   # package stays consistent. Set it to "main" to follow the newest code.
-  respeaker_lite_ref: 2026.11.2
+  respeaker_lite_ref: 2026.11.3
   # Ref of the core files (the sounds and the wake word models). It is the same
   # as respeaker_lite_ref.
   satellite_core_ref: ${respeaker_lite_ref}
