@@ -120,27 +120,13 @@ switch:
             - switch.turn_on: mute_toggle
 
 i2s_audio:
-  - id: i2s_output
-    i2s_lrclk_pin: 
-      number: GPIO7
-      allow_other_uses: true
-    i2s_bclk_pin:  
-      number: GPIO8
-      allow_other_uses: true
-    i2s_mclk_pin:  
-      number: GPIO9
-      allow_other_uses: true
-
-  - id: i2s_input
-    i2s_lrclk_pin:  
-      number: GPIO7
-      allow_other_uses: true
-    i2s_bclk_pin:  
-      number: GPIO8
-      allow_other_uses: true
-    i2s_mclk_pin:  
-      number: GPIO9
-      allow_other_uses: true
+  # One full duplex bus: the microphones and the speaker share the clocks that
+  # the XMOS board drives.
+  - id: i2s_bus
+    full_duplex: true
+    i2s_lrclk_pin: GPIO7
+    i2s_bclk_pin: GPIO8
+    i2s_mclk_pin: GPIO9
 
 microphone:
   # The XMOS board drives the I2S clocks at 48 kHz for the speaker and the
@@ -153,7 +139,7 @@ microphone:
     sample_rate: 48000
     bits_per_sample: 32bit
     i2s_mode: secondary
-    i2s_audio_id: i2s_input
+    i2s_audio_id: i2s_bus
     channel: stereo
   # Voice assistant and wake word need 16 kHz. Both channels stay. The XMOS
   # output has no content above 8 kHz, so this keeps 1 frame of 3 with no
@@ -172,7 +158,7 @@ speaker:
     i2s_mode: secondary
     i2s_dout_pin: GPIO43
     bits_per_sample: 32bit
-    i2s_audio_id: i2s_output
+    i2s_audio_id: i2s_bus
     dac_type: external
     channel: stereo
     timeout: never
