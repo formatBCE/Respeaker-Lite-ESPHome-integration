@@ -9,7 +9,7 @@ namespace respeaker_lite {
 template<typename... Ts> class RespeakerLiteFlashAction : public Action<Ts...> {
  public:
   RespeakerLiteFlashAction(RespeakerLite *parent) : parent_(parent) {}
-  void play(Ts... x) override { this->parent_->start_dfu_update(); }
+  void play(const Ts &...x) override { this->parent_->start_dfu_update(); }
 
  protected:
   RespeakerLite *parent_;

@@ -9,7 +9,7 @@ namespace respeaker_xvf3800 {
 template<typename... Ts> class RespeakerXVF3800FlashAction : public Action<Ts...> {
  public:
   RespeakerXVF3800FlashAction(RespeakerXVF3800 *parent) : parent_(parent) {}
-  void play(Ts... x) override { this->parent_->start_dfu_update(); }
+  void play(const Ts &...x) override { this->parent_->start_dfu_update(); }
 
  protected:
   RespeakerXVF3800 *parent_;
