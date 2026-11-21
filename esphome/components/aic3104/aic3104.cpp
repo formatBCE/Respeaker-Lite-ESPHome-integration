@@ -9,6 +9,13 @@ namespace aic3104 {
 
 static const char *const TAG = "aic3104";
 
+// The XVF3800 configures the codec about 5 s after it boots, and it resets the
+// codec again when it reboots on its own (after a DSP firmware update, for
+// example). So the output gain waits for the first delay and is checked again
+// every minute.
+static const uint32_t AIC3104_GAIN_SETTLE_MS = 5000;
+static const uint32_t AIC3104_GAIN_CHECK_INTERVAL_MS = 60000;
+
 #define ERROR_CHECK(err, msg) \
   if (!(err)) { \
     ESP_LOGE(TAG, msg); \
@@ -18,6 +25,22 @@ static const char *const TAG = "aic3104";
 
 void AIC3104::setup() {
   // do nothing
+}
+
+void AIC3104::loop() {
+  if (!this->output_gain_enabled_) {
+    // Nothing to do unless the optional output gain is configured. The number
+    // may call set_output_gain() before or after this setup(), so the loop
+    // stops itself here instead of in setup().
+    this->disable_loop();
+    return;
+  }
+  const uint32_t now = millis();
+  if ((int32_t) (now - this->next_gain_check_) < 0) {
+    return;
+  }
+  this->next_gain_check_ = now + AIC3104_GAIN_CHECK_INTERVAL_MS;
+  this->apply_output_gain_();
 }
 
 void AIC3104::dump_config() {
@@ -93,6 +116,63 @@ bool AIC3104::write_volume_() {
   
   return true;
 }
+
+void AIC3104::set_output_gain(uint8_t gain_db) {
+  this->output_gain_ = std::min<uint8_t>(gain_db, 9);
+  this->output_gain_enabled_ = true;
+  // Apply on the next loop, but not before the XVF3800 has set up the codec.
+  const uint32_t now = millis();
+  this->next_gain_check_ = now < AIC3104_GAIN_SETTLE_MS ? AIC3104_GAIN_SETTLE_MS : now;
+  this->enable_loop();
+}
+
+void AIC3104::apply_output_gain_() {
+  static const uint8_t level_regs[] = {AIC3104_HPLOUT_LEVEL, AIC3104_HPLCOM_LEVEL, AIC3104_HPROUT_LEVEL,
+                                       AIC3104_HPRCOM_LEVEL, AIC3104_LEFT_LOP_LEVEL, AIC3104_RIGHT_LOP_LEVEL};
+
+  if (!this->write_byte(AIC3104_PAGE_CTRL, 0x00)) {
+    ESP_LOGW(TAG, "Failed to set page 0");
+    return;
+  }
+  // D7-D4 of each output level register hold the gain in dB. D3-D0 hold the
+  // mute, drive and power bits and a read-only status bit, so keep them.
+  // The write is skipped when the value is already right, so a normal
+  // check only reads.
+  for (uint8_t reg : level_regs) {
+    uint8_t old_value;
+    if (!this->read_byte(reg, &old_value)) {
+      ESP_LOGW(TAG, "Reading output level 0x%02X failed", reg);
+      continue;
+    }
+    uint8_t new_value = (old_value & 0x0F) | (this->output_gain_ << 4);
+    if (new_value == old_value) {
+      continue;
+    }
+    if (!this->write_byte(reg, new_value)) {
+      ESP_LOGW(TAG, "Writing output level 0x%02X failed", reg);
+      continue;
+    }
+    ESP_LOGI(TAG, "Output level 0x%02X: 0x%02X -> 0x%02X (+%u dB)", reg, old_value, new_value, this->output_gain_);
+  }
+}
+
+void AIC3104OutputGain::setup() {
+  float value = 0;  // 0 dB is the default, the same as without this entity
+  this->pref_ = this->make_entity_preference<float>();
+  if (!this->pref_.load(&value)) {
+    value = 0;
+  }
+  this->publish_state(value);
+  this->parent_->set_output_gain((uint8_t) value);
+}
+
+void AIC3104OutputGain::control(float value) {
+  this->publish_state(value);
+  this->pref_.save(&value);
+  this->parent_->set_output_gain((uint8_t) value);
+}
+
+void AIC3104OutputGain::dump_config() { LOG_NUMBER("", "AIC3104 Output Gain", this); }
 
 }  // namespace aic3104
 }  // namespace esphome
