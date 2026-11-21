@@ -2,9 +2,12 @@
 
 #include "esphome/components/audio_dac/audio_dac.h"
 #include "esphome/components/i2c/i2c.h"
+#include "esphome/components/number/number.h"
 #include "esphome/core/component.h"
 #include "esphome/core/defines.h"
 #include "esphome/core/hal.h"
+#include "esphome/core/helpers.h"
+#include "esphome/core/preferences.h"
 
 namespace esphome {
 namespace aic3104 {
@@ -100,6 +103,7 @@ namespace aic3104 {
 class AIC3104 : public audio_dac::AudioDac, public Component, public i2c::I2CDevice {
  public:
   void setup() override;
+  void loop() override;
   void dump_config() override;
 
   bool set_mute_off() override;
@@ -109,11 +113,32 @@ class AIC3104 : public audio_dac::AudioDac, public Component, public i2c::I2CDev
   bool is_muted() override;
   float volume() override;
 
+  // Optional output gain, 0 to 9 dB. Called by the output gain number. The
+  // first call also starts the periodic re-apply in loop().
+  void set_output_gain(uint8_t gain_db);
+
  protected:
   bool write_mute_();
   bool write_volume_();
+  void apply_output_gain_();
 
   float volume_{0};
+  uint32_t next_gain_check_{0};
+  uint8_t output_gain_{0};
+  bool output_gain_enabled_{false};
+};
+
+// The number entity of the optional output gain. It keeps the value over
+// reboots and hands it to the codec.
+class AIC3104OutputGain : public number::Number, public Component, public Parented<AIC3104> {
+ public:
+  void setup() override;
+  void dump_config() override;
+
+ protected:
+  void control(float value) override;
+
+  ESPPreferenceObject pref_;
 };
 
 }  // namespace aic3104
